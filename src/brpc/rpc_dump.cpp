@@ -27,13 +27,11 @@
 #include "brpc/rpc_dump.h"
 #include "brpc/protocol.h"
 
-namespace bvar {
-std::string read_command_name();
-}
-
 
 namespace brpc {
-
+namespace bvar {
+  std::string read_command_name();
+}
 DECLARE_uint64(max_body_size);
 
 #define DUMPED_FILE_PREFIX "requests"

@@ -92,13 +92,6 @@
 // }
 namespace brpc {
 namespace bvar {
-namespace utils {
-// To be compatible with the old version
-using namespace ::bvar;
-}  // namespace utils
-}  // namespace bvar
-
-namespace bvar {
 
 // Specialize MutexConstructor and MutexDestructor for the Non-RAII mutexes such
 // as pthread_mutex_t
