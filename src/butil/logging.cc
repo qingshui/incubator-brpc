@@ -20,7 +20,6 @@
 #include "butil/logging.h"
 
 #include <gflags/gflags.h>
-DEFINE_bool(log_as_json, false, "Print log as a valid JSON");
 
 #if !BRPC_WITH_GLOG
 
@@ -116,6 +115,7 @@ void* BAIDU_WEAK bthread_getspecific(bthread_key_t key);
 
 namespace logging {
 
+DEFINE_bool(log_as_json, false, "Print log as a valid JSON");
 DEFINE_bool(crash_on_fatal_log, false,
             "Crash process when a FATAL log is printed");
 DEFINE_bool(print_stack_on_check, true,

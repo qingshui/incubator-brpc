@@ -30,6 +30,10 @@
 
 namespace bthread {
 
+DECLARE_int32(guard_page_size);
+DECLARE_int32(tc_stack_small);
+DECLARE_int32(tc_stack_normal);
+
 struct StackStorage {
      int stacksize;
      int guardsize;

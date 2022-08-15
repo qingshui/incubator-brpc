@@ -205,7 +205,7 @@ private:
 };
 
 }  // namespace std
-
+namespace brpc {
 namespace bvar {
 
 template <>
@@ -223,5 +223,6 @@ struct MutexDestructor<bthread_mutex_t> {
 };
 
 }  // namespace bvar
+}
 
 #endif  //BTHREAD_MUTEX_H

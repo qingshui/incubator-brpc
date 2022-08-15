@@ -22,10 +22,6 @@
 #ifndef BTHREAD_ALLOCATE_STACK_INL_H
 #define BTHREAD_ALLOCATE_STACK_INL_H
 
-DECLARE_int32(guard_page_size);
-DECLARE_int32(tc_stack_small);
-DECLARE_int32(tc_stack_normal);
-
 namespace bthread {
 
 struct MainStackClass {};
@@ -50,7 +46,7 @@ template <typename StackClass> struct StackFactory {
     struct Wrapper : public ContextualStack {
         explicit Wrapper(void (*entry)(intptr_t)) {
             if (allocate_stack_storage(&storage, *StackClass::stack_size_flag,
-                                       FLAGS_guard_page_size) != 0) {
+                bthread::FLAGS_guard_page_size) != 0) {
                 storage.zeroize();
                 context = NULL;
                 return;
@@ -153,14 +149,14 @@ template <> struct ObjectPoolBlockMaxItem<
 template <> struct ObjectPoolFreeChunkMaxItem<
     bthread::StackFactory<bthread::SmallStackClass>::Wrapper> {
     inline static size_t value() {
-        return (FLAGS_tc_stack_small <= 0 ? 0 : FLAGS_tc_stack_small);
+        return (bthread::FLAGS_tc_stack_small <= 0 ? 0 : bthread::FLAGS_tc_stack_small);
     }
 };
 
 template <> struct ObjectPoolFreeChunkMaxItem<
     bthread::StackFactory<bthread::NormalStackClass>::Wrapper> {
     inline static size_t value() {
-        return (FLAGS_tc_stack_normal <= 0 ? 0 : FLAGS_tc_stack_normal);
+        return (bthread::FLAGS_tc_stack_normal <= 0 ? 0 : bthread::FLAGS_tc_stack_normal);
     }
 };
 

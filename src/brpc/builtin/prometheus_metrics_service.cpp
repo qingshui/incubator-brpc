@@ -26,14 +26,12 @@
 #include "brpc/builtin/common.h"
 #include "bvar/bvar.h"
 
+namespace brpc {
 namespace bvar {
 DECLARE_int32(bvar_latency_p1);
 DECLARE_int32(bvar_latency_p2);
 DECLARE_int32(bvar_latency_p3);
 }
-
-namespace brpc {
-
 // Defined in server.cpp
 extern const char* const g_server_info_prefix;
 
