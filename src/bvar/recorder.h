@@ -27,7 +27,7 @@
 #include "bvar/variable.h"
 #include "bvar/window.h"
 #include "bvar/detail/sampler.h"
-
+namespace brpc {
 namespace bvar {
 
 struct Stat {
@@ -287,5 +287,5 @@ inline IntRecorder& IntRecorder::operator<<(int64_t sample) {
 }
 
 }  // namespace bvar
-
+}
 #endif  //BVAR_RECORDER_H

@@ -30,7 +30,7 @@
 #include "bvar/detail/agent_group.h"    // detail::AgentGroup
 #include "bvar/detail/is_atomical.h"
 #include "bvar/detail/call_op_returning_void.h"
-
+namespace brpc {
 namespace bvar {
 namespace detail {
 
@@ -342,5 +342,6 @@ private:
 
 }  // namespace detail
 }  // namespace bvar
+}
 
 #endif  // BVAR_COMBINER_H

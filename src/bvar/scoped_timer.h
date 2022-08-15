@@ -36,6 +36,7 @@
 // can wrap the bvar within PerSecond and make it viewable from /vars
 //   bvar::PerSecond<bvar::Adder<int64_t> > g_function1_spent_second(
 //     "function1_spent_second", &g_function1_spent);
+namespace brpc {
 namespace bvar{
 template <typename T>
 class ScopedTimer {
@@ -55,5 +56,6 @@ private:
     T* _bvar;
 };
 } // namespace bvar
+}
 
 #endif  //BVAR_SCOPED_TIMER_H

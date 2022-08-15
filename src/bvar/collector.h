@@ -25,7 +25,7 @@
 #include "butil/time.h"
 #include "butil/atomicops.h"
 #include "bvar/passive_status.h"
-
+namespace brpc {
 namespace bvar {
 
 // Containing the context for limiting sampling speed.
@@ -133,5 +133,6 @@ private:
 };
 
 }  // namespace bvar
+}
 
 #endif  // BVAR_COLLECTOR_H

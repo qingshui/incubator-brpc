@@ -19,7 +19,7 @@
 
 #include "bvar/detail/percentile.h"
 #include "butil/logging.h"
-
+namespace brpc {
 namespace bvar {
 namespace detail {
 
@@ -132,3 +132,4 @@ Percentile &Percentile::operator<<(int64_t latency) {
 
 }  // namespace detail
 }  // namespace bvar
+}

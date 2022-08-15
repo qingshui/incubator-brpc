@@ -21,7 +21,7 @@
 #define BVAR_MULTI_DIMENSION_INL_H
 
 #include <gflags/gflags_declare.h>
-
+namespace brpc {
 namespace bvar {
 
 DECLARE_int32(bvar_latency_p1);
@@ -370,5 +370,5 @@ void MultiDimension<T>::describe(std::ostream& os) {
 }
 
 } // namespace bvar
-
+}
 #endif // BVAR_MULTI_DIMENSION_INL_H

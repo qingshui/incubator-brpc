@@ -28,7 +28,7 @@
 #include "bvar/detail/is_atomical.h"
 #include "bvar/variable.h"
 #include "bvar/reducer.h"
-
+namespace brpc {
 namespace bvar {
 
 // Display a rarely or periodically updated value.
@@ -238,5 +238,5 @@ private:
 };
 
 }  // namespace bvar
-
+}
 #endif  //BVAR_STATUS_H

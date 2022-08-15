@@ -32,7 +32,7 @@
 #include "bvar/gflag.h"
 #include "bvar/variable.h"
 #include "bvar/mvariable.h"
-
+namespace brpc {
 namespace bvar {
 
 DEFINE_bool(save_series, true,
@@ -973,3 +973,4 @@ int dummy = do_link_default_variables;
 #endif
 
 }  // namespace bvar
+}

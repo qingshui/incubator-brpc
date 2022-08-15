@@ -20,7 +20,7 @@
 #include <gflags/gflags.h>
 #include "butil/unique_ptr.h"
 #include "bvar/latency_recorder.h"
-
+namespace brpc {
 namespace bvar {
 
 // Reloading following gflags does not change names of the corresponding bvars.
@@ -295,3 +295,4 @@ std::ostream& operator<<(std::ostream& os, const LatencyRecorder& rec) {
 }
 
 }  // namespace bvar
+}

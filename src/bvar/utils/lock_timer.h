@@ -92,14 +92,13 @@
 //     // and |mutex| is auto unlocked and this contention is recorded out of
 //     // the scope
 // }
-
+namespace brpc {
 namespace bvar {
 namespace utils {
 // To be compatible with the old version
 using namespace ::bvar;
 }  // namespace utils
 }  // namespace bvar
-
 namespace bvar {
 
 // Specialize MutexConstructor and MutexDestructor for the Non-RAII mutexes such
@@ -356,41 +355,41 @@ struct MutexWithLatencyRecorder
 };
 
 }  // namespace bvar
-
+}
 namespace std {
 
 // Specialize lock_guard and unique_lock
 template <typename Mutex>
-class lock_guard<bvar::MutexWithRecorder<Mutex> >
-    : public ::bvar::detail::
-                LockGuardBase< ::bvar::MutexWithRecorder<Mutex> > {
+class lock_guard<brpc::bvar::MutexWithRecorder<Mutex> >
+    : public ::brpc::bvar::detail::
+                LockGuardBase< ::brpc::bvar::MutexWithRecorder<Mutex> > {
 public:
-    typedef ::bvar::detail::
-            LockGuardBase<bvar::MutexWithRecorder<Mutex> > Base;
-    explicit lock_guard(::bvar::MutexWithRecorder<Mutex> &mutex) 
+    typedef ::brpc::bvar::detail::
+            LockGuardBase<brpc::bvar::MutexWithRecorder<Mutex> > Base;
+    explicit lock_guard(::brpc::bvar::MutexWithRecorder<Mutex> &mutex)
         : Base(mutex)
     {}
 };
 
 template <typename Mutex>
-class lock_guard<bvar::MutexWithLatencyRecorder<Mutex> >
-    : public ::bvar::detail::
-                LockGuardBase< ::bvar::MutexWithLatencyRecorder<Mutex> > {
+class lock_guard<brpc::bvar::MutexWithLatencyRecorder<Mutex> >
+    : public ::brpc::bvar::detail::
+                LockGuardBase< ::brpc::bvar::MutexWithLatencyRecorder<Mutex> > {
 public:
-    typedef ::bvar::detail::
-            LockGuardBase<bvar::MutexWithLatencyRecorder<Mutex> > Base;
-    explicit lock_guard(::bvar::MutexWithLatencyRecorder<Mutex> &mutex) 
+    typedef ::brpc::bvar::detail::
+            LockGuardBase<brpc::bvar::MutexWithLatencyRecorder<Mutex> > Base;
+    explicit lock_guard(::brpc::bvar::MutexWithLatencyRecorder<Mutex> &mutex)
         : Base(mutex)
     {}
 };
 
 template <typename Mutex>
-class unique_lock<bvar::MutexWithRecorder<Mutex> > 
-    : public ::bvar::detail::
-            UniqueLockBase< ::bvar::MutexWithRecorder<Mutex> > {
+class unique_lock<brpc::bvar::MutexWithRecorder<Mutex> >
+    : public ::brpc::bvar::detail::
+            UniqueLockBase< ::brpc::bvar::MutexWithRecorder<Mutex> > {
 public:
-    typedef ::bvar::detail::
-            UniqueLockBase< ::bvar::MutexWithRecorder<Mutex> > Base;
+    typedef ::brpc::bvar::detail::
+            UniqueLockBase< ::brpc::bvar::MutexWithRecorder<Mutex> > Base;
     typedef typename Base::mutex_type                              mutex_type;
 
     explicit unique_lock(mutex_type& mutex) 
@@ -407,12 +406,12 @@ public:
 };
 
 template <typename Mutex>
-class unique_lock<bvar::MutexWithLatencyRecorder<Mutex> > 
-    : public ::bvar::detail::
-            UniqueLockBase< ::bvar::MutexWithLatencyRecorder<Mutex> > {
+class unique_lock<brpc::bvar::MutexWithLatencyRecorder<Mutex> >
+    : public ::brpc::bvar::detail::
+            UniqueLockBase< ::brpc::bvar::MutexWithLatencyRecorder<Mutex> > {
 public:
-    typedef ::bvar::detail::
-            UniqueLockBase< ::bvar::MutexWithLatencyRecorder<Mutex> > Base;
+    typedef ::brpc::bvar::detail::
+            UniqueLockBase< ::brpc::bvar::MutexWithLatencyRecorder<Mutex> > Base;
     typedef typename Base::mutex_type                              mutex_type;
 
     explicit unique_lock(mutex_type& mutex) 

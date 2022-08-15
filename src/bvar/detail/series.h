@@ -27,7 +27,7 @@
 #include "bvar/vector.h"
 #include "bvar/detail/call_op_returning_void.h"
 #include "butil/string_splitter.h"
-
+namespace brpc {
 namespace bvar {
 namespace detail {
 
@@ -328,5 +328,6 @@ void Series<Vector<T,N>, Op>::describe(std::ostream& os,
 
 }  // namespace detail
 }  // namespace bvar
+}
 
 #endif  // BVAR_DETAIL_SERIES_H

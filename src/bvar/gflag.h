@@ -22,7 +22,7 @@
 
 #include <string>                       // std::string
 #include "bvar/variable.h"
-
+namespace brpc {
 namespace bvar {
 
 // Expose important gflags as bvar so that they're monitored.
@@ -61,5 +61,6 @@ private:
 };
 
 }  // namespace bvar
+}
 
 #endif  //BVAR_GFLAG_H

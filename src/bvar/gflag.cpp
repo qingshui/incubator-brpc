@@ -20,7 +20,7 @@
 #include <stdlib.h>
 #include <gflags/gflags.h>
 #include "bvar/gflag.h"
-
+namespace brpc {
 namespace bvar {
 
 GFlag::GFlag(const butil::StringPiece& gflag_name) {
@@ -89,3 +89,4 @@ bool GFlag::set_value(const char* value) {
 }
 
 }  // namespace bvar
+}

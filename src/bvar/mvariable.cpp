@@ -26,7 +26,7 @@
 #include "butil/file_util.h"                     // butil::FilePath
 #include "bvar/variable.h"
 #include "bvar/mvariable.h"
-
+namespace brpc {
 namespace bvar {
 
 constexpr uint64_t MAX_LABELS_COUNT = 10;
@@ -251,3 +251,4 @@ size_t MVariable::dump_exposed(Dumper* dumper, const DumpOptions* options) {
 }
 
 } // namespace bvar
+}
