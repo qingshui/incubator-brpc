@@ -668,17 +668,17 @@ static bool created_dumping_thread = false;
 static pthread_mutex_t dump_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t dump_cond = PTHREAD_COND_INITIALIZER;
 
-DEFINE_bool(bvar_dump, false,
+DEFINE_bool(brpc_bvar_dump, false,
             "Create a background thread dumping all bvar periodically, "
             "all bvar_dump_* flags are not effective when this flag is off");
-DEFINE_int32(bvar_dump_interval, 10, "Seconds between consecutive dump");
-DEFINE_string(bvar_dump_file, "monitor/bvar.<app>.data", "Dump bvar into this file");
-DEFINE_string(bvar_dump_include, "", "Dump bvar matching these wildcards, "
+DEFINE_int32(brpc_bvar_dump_interval, 10, "Seconds between consecutive dump");
+DEFINE_string(brpc_bvar_dump_file, "monitor/bvar.<app>.data", "Dump bvar into this file");
+DEFINE_string(brpc_bvar_dump_include, "", "Dump bvar matching these wildcards, "
               "separated by semicolon(;), empty means including all");
-DEFINE_string(bvar_dump_exclude, "", "Dump bvar excluded from these wildcards, "
+DEFINE_string(brpc_bvar_dump_exclude, "", "Dump bvar excluded from these wildcards, "
               "separated by semicolon(;), empty means no exclusion");
-DEFINE_string(bvar_dump_prefix, "<app>", "Every dumped name starts with this prefix");
-DEFINE_string(bvar_dump_tabs, "latency=*_latency*"
+DEFINE_string(brpc_bvar_dump_prefix, "<app>", "Every dumped name starts with this prefix");
+DEFINE_string(brpc_bvar_dump_tabs, "latency=*_latency*"
                               "; qps=*_qps*"
                               "; error=*_error*"
                               "; system=*process_*,*malloc_*,*kernel_*",

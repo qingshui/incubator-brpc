@@ -27,7 +27,7 @@
 #include "brpc/builtin/vars_service.h"
 
 namespace bvar {
-DECLARE_bool(quote_vector);
+DECLARE_bool(brpc_quote_vector);
 }
 
 
@@ -222,7 +222,7 @@ void PutVarsHeading(std::ostream& os, bool expand_all) {
         "        $(\"#value-\" + var_name).html(series.data[series.data.length - 1][1]);\n"
         "      } else {\n"
         "        lastPlot[var_name] = $.plot(\"#\" + var_name, series, trendOptions);\n"
-       << (bvar::FLAGS_quote_vector ?
+       << (bvar::FLAGS_brpc_quote_vector ?
         "        var newValue = '\"[';\n" :
         "        var newValue = '[';\n") <<
         "        var i;\n"
@@ -231,7 +231,7 @@ void PutVarsHeading(std::ostream& os, bool expand_all) {
         "            var data = series[i].data;\n"
         "            newValue += data[data.length - 1][1];\n"
         "        }\n"
-       << (bvar::FLAGS_quote_vector ?
+       << (bvar::FLAGS_brpc_quote_vector ?
         "        newValue += ']\"';\n" :
         "        newValue += ']';\n") <<
         "        $(\"#value-\" + var_name).html(newValue);\n"
