@@ -61,6 +61,26 @@ TEST(RandUtilTest, Sanity) {
     EXPECT_EQ(butil::fast_rand_in(std::numeric_limits<uint64_t>::max(),
                                   std::numeric_limits<uint64_t>::max()),
               std::numeric_limits<uint64_t>::max());
+    char bytes[1001] = { 0 };  // must set the first byte to avoid clang's incorrect optimization
+    char first_byte = bytes[0];
+    char some_byte = bytes[1];
+    for (int i = 0; i < 10; ++i) {
+        butil::fast_rand_bytes(bytes, 1);
+        EXPECT_EQ(some_byte, bytes[1]) << "fast_rand_bytes control out-of-range";
+        if (bytes[0] != first_byte) {
+            break;
+        }
+        EXPECT_NE(9, i) << "Seems not meet random";
+    }
+    first_byte = bytes[0];
+    some_byte = bytes[1000];
+    for (int i = 0; i < 10; ++i) {
+        butil::fast_rand_bytes(bytes, 1001);
+        if (bytes[0] != first_byte && bytes[1000] != some_byte) {
+            break;
+        }
+        EXPECT_NE(9, i) << "Seems not meet random";
+    }
 }
 
 TEST(RandUtilTest, RandDouble) {
@@ -138,8 +158,8 @@ TEST(RandUtilTest, RandGeneratorIsUniform) {
             // Don't quit too quickly for things to start converging, or we may have
             // a false positive.
             if (count > kMinAttempts &&
-                double(kExpectedAverage - kAllowedVariance) < cumulative_average &&
-                cumulative_average < double(kExpectedAverage + kAllowedVariance)) {
+                kExpectedAverage - kAllowedVariance < cumulative_average &&
+                cumulative_average < kExpectedAverage + kAllowedVariance) {
                 break;
             }
 

@@ -1,20 +1,19 @@
-// Licensed to the Apache Software Foundation (ASF) under one
-// or more contributor license agreements.  See the NOTICE file
-// distributed with this work for additional information
-// regarding copyright ownership.  The ASF licenses this file
-// to you under the Apache License, Version 2.0 (the
-// "License"); you may not use this file except in compliance
-// with the License.  You may obtain a copy of the License at
-//
-//   http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing,
-// software distributed under the License is distributed on an
-// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-// KIND, either express or implied.  See the License for the
-// specific language governing permissions and limitations
-// under the License.
+// Copyright (c) 2016 Baidu, Inc.
+// 
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+// 
+//     http://www.apache.org/licenses/LICENSE-2.0
+// 
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
+// Authors: Ge,Jun (gejun@baidu.com)
+//          Jiashun Zhu (zhujiashun@baidu.com)
 
 #include <openssl/hmac.h> // HMAC_CTX_init
 #include <google/protobuf/io/zero_copy_stream_impl_lite.h>
@@ -733,7 +732,7 @@ RtmpContext::RtmpContext(const RtmpClientOptions* copt, const Server* server)
     _free_ms_ids.reserve(32);
     CHECK_EQ(0, _mstream_map.init(1024, 70));
     CHECK_EQ(0, _trans_map.init(1024, 70));
-    memset(static_cast<void*>(_cstream_ctx), 0, sizeof(_cstream_ctx));
+    memset(_cstream_ctx, 0, sizeof(_cstream_ctx));
 }
     
 RtmpContext::~RtmpContext() {
@@ -809,7 +808,7 @@ RtmpUnsentMessage::AppendAndDestroySelf(butil::IOBuf* out, Socket* s) {
 }
 
 RtmpContext::SubChunkArray::SubChunkArray() {
-    memset(static_cast<void*>(ptrs), 0, sizeof(ptrs));
+    memset(ptrs, 0, sizeof(ptrs));
 }
 
 RtmpContext::SubChunkArray::~SubChunkArray() {
@@ -3525,8 +3524,8 @@ void OnServerStreamCreated::Run(bool error,
             break;
         }
         _stream->_message_stream_id = stream_id;
-        // client stream needs to be added here rather than OnDestroyingStream
-        // to avoid the race between OnDestroyingStream and a failed OnStatus,
+        // client stream needs to be added here rather than OnStreamCreationDone
+        // to avoid the race between OnStreamCreationDone and a failed OnStatus,
         // because the former function runs in another bthread and may run later
         // than OnStatus which needs to see the stream.
         if (!ctx->AddClientStream(_stream.get())) {

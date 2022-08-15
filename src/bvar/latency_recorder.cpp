@@ -1,20 +1,18 @@
-// Licensed to the Apache Software Foundation (ASF) under one
-// or more contributor license agreements.  See the NOTICE file
-// distributed with this work for additional information
-// regarding copyright ownership.  The ASF licenses this file
-// to you under the Apache License, Version 2.0 (the
-// "License"); you may not use this file except in compliance
-// with the License.  You may obtain a copy of the License at
-//
-//   http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing,
-// software distributed under the License is distributed on an
-// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-// KIND, either express or implied.  See the License for the
-// specific language governing permissions and limitations
-// under the License.
+// Copyright (c) 2014 Baidu, Inc.
+// 
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+// 
+//     http://www.apache.org/licenses/LICENSE-2.0
+// 
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
+// Author: Ge,Jun (gejun@baidu.com)
 // Date: 2014/09/22 11:57:43
 
 #include <gflags/gflags.h>
@@ -89,23 +87,14 @@ int CDF::describe_series(
     return 0;
 }
 
-// Return random int value with expectation = `dval'
-static int64_t double_to_random_int(double dval) {
-    int64_t ival = static_cast<int64_t>(dval);
-    if (dval > ival + butil::fast_rand_double()) {
-        ival += 1;
-    }
-    return ival;
-}
-
 static int64_t get_window_recorder_qps(void* arg) {
     detail::Sample<Stat> s;
-    static_cast<RecorderWindow*>(arg)->get_span(&s);
+    static_cast<RecorderWindow*>(arg)->get_span(1, &s);
     // Use floating point to avoid overflow.
     if (s.time_us <= 0) {
         return 0;
     }
-    return double_to_random_int(s.data.num * 1000000.0 / s.time_us);
+    return static_cast<int64_t>(round(s.data.num * 1000000.0 / s.time_us));
 }
 
 static int64_t get_recorder_count(void* arg) {
@@ -185,7 +174,7 @@ int64_t LatencyRecorder::qps(time_t window_size) const {
     if (s.time_us <= 0) {
         return 0;
     }
-    return detail::double_to_random_int(s.data.num * 1000000.0 / s.time_us);
+    return static_cast<int64_t>(round(s.data.num * 1000000.0 / s.time_us));
 }
 
 int LatencyRecorder::expose(const butil::StringPiece& prefix1,
@@ -276,8 +265,6 @@ void LatencyRecorder::hide() {
     _latency_p3.hide();
     _latency_999.hide();
     _latency_9999.hide();
-    _latency_cdf.hide();
-    _latency_percentiles.hide();
 }
 
 LatencyRecorder& LatencyRecorder::operator<<(int64_t latency) {

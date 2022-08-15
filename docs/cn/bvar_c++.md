@@ -1,34 +1,5 @@
-- [bvar Introduction](#bvar-introduction)
-- [bvar::Variable](#bvarvariable)
-- [Export all variables](#export-all-variables)
-- [bvar::Reducer](#bvarreducer)
-  - [bvar::Adder](#bvaradder)
-  - [bvar::Maxer](#bvarmaxer)
-  - [bvar::Miner](#bvarminer)
-- [bvar::IntRecorder](#bvarintrecorder)
-- [bvar::LatencyRecorder](#bvarlatencyrecorder)
-- [bvar::Window](#bvarwindow)
-- [bvar::PerSecond](#bvarpersecond)
-  - [和Window的差别](#和window的差别)
-- [bvar::Status](#bvarstatus)
-- [bvar::PassiveStatus](#bvarpassivestatus)
-- [bvar::GFlag](#bvargflag)
+# Quick introduction
 
-# bvar Introduction
-
-单维度bvar使用文档，多维度mbvar请[移步](mbvar_c++.md)。
-
-bvar分为多个具体的类，常用的有：
-
-- `bvar::Adder<T>` : 计数器，默认0，varname << N相当于varname += N。
-- `bvar::Maxer<T>` : 求最大值，默认std::numeric_limits<T>::min()，varname << N相当于varname = max(varname, N)。
-- `bvar::Miner<T>` : 求最小值，默认std::numeric_limits<T>::max()，varname << N相当于varname = min(varname, N)。
-- `bvar::IntRecorder` : 求自使用以来的平均值。注意这里的定语不是“一段时间内”。一般要通过Window衍生出时间窗口内的平均值。
-- `bvar::Window<VAR>` : 获得某个bvar在一段时间内的累加值。Window衍生于已存在的bvar，会自动更新。
-- `bvar::PerSecond<VAR>` : 获得某个bvar在一段时间内平均每秒的累加值。PerSecond也是会自动更新的衍生变量。
-- `bvar::LatencyRecorder` : 专用于记录延时和qps的变量。输入延时，平均延时/最大延时/qps/总次数 都有了。
-
-例子：
 ```c++
 #include <bvar/bvar.h>
 
@@ -43,7 +14,7 @@ bvar::Window<bvar::Adder<int> > g_read_error_minute("foo_bar", "read_error", &g_
 //                                                    前缀       监控项名称                  60秒,忽略则为10秒
 
 // bvar::LatencyRecorder是一个复合变量，可以统计：总量、qps、平均延时，延时分位值，最大延时。
-bvar::LatencyRecorder g_write_latency("foo_bar", "write");
+bvar::LatencyRecorder g_write_latency(“foo_bar", "write”);
 //                                      ^          ^
 //                                     前缀       监控项，别加latency！LatencyRecorder包含多个bvar，它们会加上各自的后缀，比如write_qps, write_latency等等。
 
@@ -73,7 +44,17 @@ foo::bar::g_task_pushed << 1;
 
 注意Window<>和PerSecond<>都是衍生变量，会自动更新，你不用给它们推值。你当然也可以把bvar作为成员变量或局部变量。
 
-**确认变量名是全局唯一的！** 否则会曝光失败，如果-bvar_abort_on_same_name为true，程序会直接abort。
+常用的bvar有：
+
+- `bvar::Adder<T>` : 计数器，默认0，varname << N相当于varname += N。
+- `bvar::Maxer<T>` : 求最大值，默认std::numeric_limits<T>::min()，varname << N相当于varname = max(varname, N)。
+- `bvar::Miner<T>` : 求最小值，默认std::numeric_limits<T>::max()，varname << N相当于varname = min(varname, N)。
+- `bvar::IntRecorder` : 求自使用以来的平均值。注意这里的定语不是“一段时间内”。一般要通过Window衍生出时间窗口内的平均值。
+- `bvar::Window<VAR>` : 获得某个bvar在一段时间内的累加值。Window衍生于已存在的bvar，会自动更新。
+- `bvar::PerSecond<VAR>` : 获得某个bvar在一段时间内平均每秒的累加值。PerSecond也是会自动更新的衍生变量。
+- `bvar::LatencyRecorder` : 专用于记录延时和qps的变量。输入延时，平均延时/最大延时/qps/总次数 都有了。
+
+**确认变量名是全局唯一的！**否则会曝光失败，如果-bvar_abort_on_same_name为true，程序会直接abort。
 
 程序中有来自各种模块不同的bvar，为避免重名，建议如此命名：**模块_类名_指标**
 
@@ -106,7 +87,7 @@ rpc_socket_count : 6                            # 模块=rpc     类名=socket  
 ```c++
 namespace foo {
 namespace bar {
-// 注意g_read_error_minute和g_task_pushed_second都是衍生的bvar，会自动更新，不要声明。
+// 注意g_read_error_minute和g_task_pushed_per_second都是衍生的bvar，会自动更新，不要声明。
 extern bvar::Adder<int> g_read_error;
 extern bvar::LatencyRecorder g_write_latency;
 extern bvar::Adder<int> g_task_pushed;
@@ -154,7 +135,7 @@ public:
 
 Variable是所有bvar的基类，主要提供全局注册，列举，查询等功能。
 
-用户以默认参数建立一个bvar时，这个bvar并未注册到任何全局结构中，在这种情况下，bvar纯粹是一个更快的计数器。我们称把一个bvar注册到全局表中的行为为“曝光”，可通过`expose`函数曝光：
+用户以默认参数建立一个bvar时，这个bvar并未注册到任何全局结构中，在这种情况下，bvar纯粹是一个更快的计数器。我们称把一个bvar注册到全局表中的行为为”曝光“，可通过**expose**函数曝光：
 ```c++
 // Expose this variable globally so that it's counted in following functions:
 //   list_exposed
@@ -163,11 +144,11 @@ Variable是所有bvar的基类，主要提供全局注册，列举，查询等�
 //   find_exposed
 // Return 0 on success, -1 otherwise.
 int expose(const butil::StringPiece& name);
-int expose_as(const butil::StringPiece& prefix, const butil::StringPiece& name);
+int expose(const butil::StringPiece& prefix, const butil::StringPiece& name);
 ```
 全局曝光后的bvar名字便为name或prefix + name，可通过以_exposed为后缀的static函数查询。比如Variable::describe_exposed(name)会返回名为name的bvar的描述。
 
-当相同名字的bvar已存在时，expose会打印FATAL日志并返回-1。如果选项 **-bvar_abort_on_same_name**设为true (默认是false)，程序会直接abort。
+当相同名字的bvar已存在时，expose会打印FATAL日志并返回-1。如果选项**--bvar_abort_on_same_name**设为true (默认是false)，程序会直接abort。
 
 下面是一些曝光bvar的例子：
 ```c++
@@ -187,7 +168,7 @@ bvar::Status<std::string> status1("count2", "hello");  // the name conflicts. if
                                                        // program aborts, otherwise a fatal log is printed.
 ```
 
-为避免重名，bvar的名字应加上前缀，建议为`<namespace>_<module>_<name>`。为了方便使用，我们提供了**expose_as**函数，接收一个前缀。
+为避免重名，bvar的名字应加上前缀，建议为<namespace>_<module>_<name>。为了方便使用，我们提供了**expose_as**函数，接收一个前缀。
 ```c++
 // Expose this variable with a prefix.
 // Example:
@@ -240,7 +221,7 @@ dump功能由如下gflags控制：
 | ------------------ | ----------------------- | ---------------------------------------- |
 | bvar_dump          | false                   | Create a background thread dumping all bvar periodically, all bvar_dump_* flags are not effective when this flag is off |
 | bvar_dump_exclude  | ""                      | Dump bvar excluded from these wildcards(separated by comma), empty means no exclusion |
-| bvar_dump_file     | monitor/bvar.\<app\>.data | Dump bvar into this file                 |
+| bvar_dump_file     | monitor/bvar.<app>.data | Dump bvar into this file                 |
 | bvar_dump_include  | ""                      | Dump bvar matching these wildcards(separated by comma), empty means including all |
 | bvar_dump_interval | 10                      | Seconds between consecutive dump         |
 | bvar_dump_prefix   | \<app\>                 | Every dumped name starts with this prefix |
@@ -338,7 +319,7 @@ reducer << e1 << e2 << e3的作用等价于reducer = e1 op e2 op e3。
 顾名思义，用于累加，Op为+。
 ```c++
 bvar::Adder<int> value;
-value << 1 << 2 << 3 << -4;
+value<< 1 << 2 << 3 << -4;
 CHECK_EQ(2, value.get_value());
 
 bvar::Adder<double> fp_value;  // 可能有warning
@@ -359,7 +340,7 @@ CHECK_EQ("hello world", concater.get_value());
 用于取最大值，运算符为std::max。
 ```c++
 bvar::Maxer<int> value;
-value << 1 << 2 << 3 << -4;
+value<< 1 << 2 << 3 << -4;
 CHECK_EQ(3, value.get_value());
 ```
 Since Maxer<> use std::numeric_limits<T>::min() as the identity, it cannot be applied to generic types unless you specialized std::numeric_limits<> (and overloaded operator<, yes, not operator>).
@@ -369,7 +350,7 @@ Since Maxer<> use std::numeric_limits<T>::min() as the identity, it cannot be ap
 用于取最小值，运算符为std::min。
 ```c++
 bvar::Maxer<int> value;
-value << 1 << 2 << 3 << -4;
+value<< 1 << 2 << 3 << -4;
 CHECK_EQ(-4, value.get_value());
 ```
 Since Miner<> use std::numeric_limits<T>::max() as the identity, it cannot be applied to generic types unless you specialized std::numeric_limits<> (and overloaded operator<).

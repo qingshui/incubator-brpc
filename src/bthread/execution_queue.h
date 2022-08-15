@@ -1,22 +1,19 @@
-// Licensed to the Apache Software Foundation (ASF) under one
-// or more contributor license agreements.  See the NOTICE file
-// distributed with this work for additional information
-// regarding copyright ownership.  The ASF licenses this file
-// to you under the Apache License, Version 2.0 (the
-// "License"); you may not use this file except in compliance
-// with the License.  You may obtain a copy of the License at
-//
-//   http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing,
-// software distributed under the License is distributed on an
-// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-// KIND, either express or implied.  See the License for the
-// specific language governing permissions and limitations
-// under the License.
-
 // bthread - A M:N threading library to make applications more concurrent.
+// Copyright (c) 2015 Baidu, Inc.
+// 
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+// 
+//     http://www.apache.org/licenses/LICENSE-2.0
+// 
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
+// Author: Zhangyi Chen (chenzhangyi01@baidu.com)
 // Date: 2015/10/23 18:16:16
 
 #ifndef  BTHREAD_EXECUTION_QUEUE_H
@@ -29,7 +26,7 @@ namespace bthread {
 
 // ExecutionQueue is a special wait-free MPSC queue of which the consumer thread
 // is auto started by the execute operation and auto quits if there are no more 
-// tasks, in another word there isn't a daemon bthread waiting to consume tasks.
+// tasks, in another word there isn't a daemon bthread waiting to consume tasks
 
 template <typename T> struct ExecutionQueueId;
 template <typename T> class ExecutionQueue;
@@ -76,7 +73,7 @@ private:
 // 
 // Examples:
 // int demo_execute(void* meta, TaskIterator<T>& iter) {
-//     if (iter.is_queue_stopped()) {
+//     if (iter.is_stopped()) {
 //         // destroy meta and related resources
 //         return 0;
 //     }
@@ -131,24 +128,11 @@ const static TaskOptions TASK_OPTIONS_NORMAL = TaskOptions(false, false);
 const static TaskOptions TASK_OPTIONS_URGENT = TaskOptions(true, false);
 const static TaskOptions TASK_OPTIONS_INPLACE = TaskOptions(false, true);
 
-class Executor {
-public:
-    virtual ~Executor() {}
-
-    // Return 0 on success.
-    virtual int submit(void * (*fn)(void*), void* args) = 0;
-};
-
 struct ExecutionQueueOptions {
     ExecutionQueueOptions();
     // Attribute of the bthread which execute runs on
     // default: BTHREAD_ATTR_NORMAL
     bthread_attr_t bthread_attr;
-
-    // Executor that tasks run on. bthread will be used when executor = NULL.
-    // Note that TaskOptions.in_place_if_possible = false will not work, if implementation of
-    // Executor is in-place(synchronous).
-    Executor * executor;
 };
 
 // Start a ExecutionQueue. If |options| is NULL, the queue will be created with
@@ -198,7 +182,7 @@ int execution_queue_execute(ExecutionQueueId<T> id,
                             const TaskOptions* options,
                             TaskHandle* handle);
 
-// [Thread safe and ABA free] Cancel the corresponding task.
+// [Thread safe and ABA free] Cancel the corrosponding task.
 // Returns:
 //  -1: The task was executed or h is an invalid handle
 //  0: Success

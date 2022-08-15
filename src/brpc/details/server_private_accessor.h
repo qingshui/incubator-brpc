@@ -1,19 +1,16 @@
-// Licensed to the Apache Software Foundation (ASF) under one
-// or more contributor license agreements.  See the NOTICE file
-// distributed with this work for additional information
-// regarding copyright ownership.  The ASF licenses this file
-// to you under the Apache License, Version 2.0 (the
-// "License"); you may not use this file except in compliance
-// with the License.  You may obtain a copy of the License at
-//
-//   http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing,
-// software distributed under the License is distributed on an
-// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-// KIND, either express or implied.  See the License for the
-// specific language governing permissions and limitations
-// under the License.
+// Copyright (c) 2015 Baidu, Inc.
+// 
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+// 
+//     http://www.apache.org/licenses/LICENSE-2.0
+// 
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 #ifndef BRPC_SERVER_PRIVATE_ACCESSOR_H
 #define BRPC_SERVER_PRIVATE_ACCESSOR_H
@@ -24,6 +21,7 @@
 #include "brpc/details/method_status.h"
 #include "brpc/builtin/bad_method_service.h"
 #include "brpc/restful.h"
+
 
 namespace brpc {
 
@@ -37,19 +35,25 @@ public:
     }
 
     void AddError() {
-        _server->_nerror_bvar << 1;
+        _server->_nerror << 1;
     }
 
-    // Returns true if the `max_concurrency' limit is not reached.
+    // Returns true iff the `max_concurrency' limit is not reached.
     bool AddConcurrency(Controller* c) {
         if (_server->options().max_concurrency <= 0) {
             return true;
         }
-        c->add_flag(Controller::FLAGS_ADDED_CONCURRENCY);
-        return (butil::subtle::NoBarrier_AtomicIncrement(&_server->_concurrency, 1)
-                <= _server->options().max_concurrency);
+        if (butil::subtle::NoBarrier_AtomicIncrement(&_server->_concurrency, 1)
+            <= _server->options().max_concurrency) {
+            c->add_flag(Controller::FLAGS_ADDED_CONCURRENCY);
+            return true;
+        }
+        butil::subtle::NoBarrier_AtomicIncrement(&_server->_concurrency, -1);
+        return false;
     }
 
+    // Remove the increment of AddConcurrency(). Must not be called when
+    // AddConcurrency() returned false.
     void RemoveConcurrency(const Controller* c) {
         if (c->has_flag(Controller::FLAGS_ADDED_CONCURRENCY)) {
             butil::subtle::NoBarrier_AtomicIncrement(&_server->_concurrency, -1);
@@ -99,7 +103,7 @@ public:
 
     RestfulMap* global_restful_map() const
     { return _server->_global_restful_map; }
-
+    
 private:
     const Server* _server;
 };
@@ -123,6 +127,20 @@ private:
     DISALLOW_COPY_AND_ASSIGN(ScopedNonServiceError);
     const Server* _server;
 };
+
+class ScopedRemoveConcurrency {
+public:
+    ScopedRemoveConcurrency(const Server* server, const Controller* c)
+        : _server(server), _cntl(c) {}
+    ~ScopedRemoveConcurrency() {
+        ServerPrivateAccessor(_server).RemoveConcurrency(_cntl);
+    }
+private:
+    DISALLOW_COPY_AND_ASSIGN(ScopedRemoveConcurrency);
+    const Server* _server;
+    const Controller* _cntl;
+};
+
 
 } // namespace brpc
 

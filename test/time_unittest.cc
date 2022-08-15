@@ -161,10 +161,7 @@ TEST_F(TimeTest, LocalMidnight) {
   EXPECT_EQ(0, exploded.millisecond);
 }
 
-// TODO(zhujiashun): Time::FromString is not implemented after removing nspr,
-// so all tests using this function is disabled. Enable those tests once
-// Time::FromString is implemented.
-TEST_F(TimeTest, DISABLED_ParseTimeTest1) {
+TEST_F(TimeTest, ParseTimeTest1) {
   time_t current_time = 0;
   time(&current_time);
 
@@ -185,7 +182,7 @@ TEST_F(TimeTest, DISABLED_ParseTimeTest1) {
   EXPECT_EQ(current_time, parsed_time.ToTimeT());
 }
 
-TEST_F(TimeTest, DISABLED_DayOfWeekSunday) {
+TEST_F(TimeTest, DayOfWeekSunday) {
   Time time;
   EXPECT_TRUE(Time::FromString("Sun, 06 May 2012 12:00:00 GMT", &time));
   Time::Exploded exploded;
@@ -193,7 +190,7 @@ TEST_F(TimeTest, DISABLED_DayOfWeekSunday) {
   EXPECT_EQ(0, exploded.day_of_week);
 }
 
-TEST_F(TimeTest, DISABLED_DayOfWeekWednesday) {
+TEST_F(TimeTest, DayOfWeekWednesday) {
   Time time;
   EXPECT_TRUE(Time::FromString("Wed, 09 May 2012 12:00:00 GMT", &time));
   Time::Exploded exploded;
@@ -201,7 +198,7 @@ TEST_F(TimeTest, DISABLED_DayOfWeekWednesday) {
   EXPECT_EQ(3, exploded.day_of_week);
 }
 
-TEST_F(TimeTest, DISABLED_DayOfWeekSaturday) {
+TEST_F(TimeTest, DayOfWeekSaturday) {
   Time time;
   EXPECT_TRUE(Time::FromString("Sat, 12 May 2012 12:00:00 GMT", &time));
   Time::Exploded exploded;
@@ -209,62 +206,62 @@ TEST_F(TimeTest, DISABLED_DayOfWeekSaturday) {
   EXPECT_EQ(6, exploded.day_of_week);
 }
 
-TEST_F(TimeTest, DISABLED_ParseTimeTest2) {
+TEST_F(TimeTest, ParseTimeTest2) {
   Time parsed_time;
   EXPECT_TRUE(Time::FromString("Mon, 15 Oct 2007 19:45:00 GMT", &parsed_time));
   EXPECT_EQ(comparison_time_pdt_, parsed_time);
 }
 
-TEST_F(TimeTest, DISABLED_ParseTimeTest3) {
+TEST_F(TimeTest, ParseTimeTest3) {
   Time parsed_time;
   EXPECT_TRUE(Time::FromString("15 Oct 07 12:45:00", &parsed_time));
   EXPECT_EQ(comparison_time_local_, parsed_time);
 }
 
-TEST_F(TimeTest, DISABLED_ParseTimeTest4) {
+TEST_F(TimeTest, ParseTimeTest4) {
   Time parsed_time;
   EXPECT_TRUE(Time::FromString("15 Oct 07 19:45 GMT", &parsed_time));
   EXPECT_EQ(comparison_time_pdt_, parsed_time);
 }
 
-TEST_F(TimeTest, DISABLED_ParseTimeTest5) {
+TEST_F(TimeTest, ParseTimeTest5) {
   Time parsed_time;
   EXPECT_TRUE(Time::FromString("Mon Oct 15 12:45 PDT 2007", &parsed_time));
   EXPECT_EQ(comparison_time_pdt_, parsed_time);
 }
 
-TEST_F(TimeTest, DISABLED_ParseTimeTest6) {
+TEST_F(TimeTest, ParseTimeTest6) {
   Time parsed_time;
   EXPECT_TRUE(Time::FromString("Monday, Oct 15, 2007 12:45 PM", &parsed_time));
   EXPECT_EQ(comparison_time_local_, parsed_time);
 }
 
-TEST_F(TimeTest, DISABLED_ParseTimeTest7) {
+TEST_F(TimeTest, ParseTimeTest7) {
   Time parsed_time;
   EXPECT_TRUE(Time::FromString("10/15/07 12:45:00 PM", &parsed_time));
   EXPECT_EQ(comparison_time_local_, parsed_time);
 }
 
-TEST_F(TimeTest, DISABLED_ParseTimeTest8) {
+TEST_F(TimeTest, ParseTimeTest8) {
   Time parsed_time;
   EXPECT_TRUE(Time::FromString("15-OCT-2007 12:45pm", &parsed_time));
   EXPECT_EQ(comparison_time_local_, parsed_time);
 }
 
-TEST_F(TimeTest, DISABLED_ParseTimeTest9) {
+TEST_F(TimeTest, ParseTimeTest9) {
   Time parsed_time;
   EXPECT_TRUE(Time::FromString("16 Oct 2007 4:45-JST (Tuesday)", &parsed_time));
   EXPECT_EQ(comparison_time_pdt_, parsed_time);
 }
 
-TEST_F(TimeTest, DISABLED_ParseTimeTest10) {
+TEST_F(TimeTest, ParseTimeTest10) {
   Time parsed_time;
   EXPECT_TRUE(Time::FromString("15/10/07 12:45", &parsed_time));
   EXPECT_EQ(parsed_time, comparison_time_local_);
 }
 
 // Test some of edge cases around epoch, etc.
-TEST_F(TimeTest, DISABLED_ParseTimeTestEpoch0) {
+TEST_F(TimeTest, ParseTimeTestEpoch0) {
   Time parsed_time;
 
   // time_t == epoch == 0
@@ -276,7 +273,7 @@ TEST_F(TimeTest, DISABLED_ParseTimeTestEpoch0) {
   EXPECT_EQ(0, parsed_time.ToTimeT());
 }
 
-TEST_F(TimeTest, DISABLED_ParseTimeTestEpoch1) {
+TEST_F(TimeTest, ParseTimeTestEpoch1) {
   Time parsed_time;
 
   // time_t == 1 second after epoch == 1
@@ -288,7 +285,7 @@ TEST_F(TimeTest, DISABLED_ParseTimeTestEpoch1) {
   EXPECT_EQ(1, parsed_time.ToTimeT());
 }
 
-TEST_F(TimeTest, DISABLED_ParseTimeTestEpoch2) {
+TEST_F(TimeTest, ParseTimeTestEpoch2) {
   Time parsed_time;
 
   // time_t == 2 seconds after epoch == 2
@@ -300,7 +297,7 @@ TEST_F(TimeTest, DISABLED_ParseTimeTestEpoch2) {
   EXPECT_EQ(2, parsed_time.ToTimeT());
 }
 
-TEST_F(TimeTest, DISABLED_ParseTimeTestEpochNeg1) {
+TEST_F(TimeTest, ParseTimeTestEpochNeg1) {
   Time parsed_time;
 
   // time_t == 1 second before epoch == -1
@@ -315,7 +312,7 @@ TEST_F(TimeTest, DISABLED_ParseTimeTestEpochNeg1) {
 // If time_t is 32 bits, a date after year 2038 will overflow time_t and
 // cause timegm() to return -1.  The parsed time should not be 1 second
 // before epoch.
-TEST_F(TimeTest, DISABLED_ParseTimeTestEpochNotNeg1) {
+TEST_F(TimeTest, ParseTimeTestEpochNotNeg1) {
   Time parsed_time;
 
   EXPECT_TRUE(Time::FromString("Wed Dec 31 23:59:59 GMT 2100",
@@ -323,7 +320,7 @@ TEST_F(TimeTest, DISABLED_ParseTimeTestEpochNotNeg1) {
   EXPECT_NE(-1, parsed_time.ToTimeT());
 }
 
-TEST_F(TimeTest, DISABLED_ParseTimeTestEpochNeg2) {
+TEST_F(TimeTest, ParseTimeTestEpochNeg2) {
   Time parsed_time;
 
   // time_t == 2 seconds before epoch == -2
@@ -335,7 +332,7 @@ TEST_F(TimeTest, DISABLED_ParseTimeTestEpochNeg2) {
   EXPECT_EQ(-2, parsed_time.ToTimeT());
 }
 
-TEST_F(TimeTest, DISABLED_ParseTimeTestEpoch1960) {
+TEST_F(TimeTest, ParseTimeTestEpoch1960) {
   Time parsed_time;
 
   // time_t before Epoch, in 1960
@@ -350,12 +347,12 @@ TEST_F(TimeTest, DISABLED_ParseTimeTestEpoch1960) {
   EXPECT_EQ(-300003599, parsed_time.ToTimeT());
 }
 
-TEST_F(TimeTest, DISABLED_ParseTimeTestEmpty) {
+TEST_F(TimeTest, ParseTimeTestEmpty) {
   Time parsed_time;
   EXPECT_FALSE(Time::FromString("", &parsed_time));
 }
 
-TEST_F(TimeTest, DISABLED_ParseTimeTestInvalidString) {
+TEST_F(TimeTest, ParseTimeTestInvalidString) {
   Time parsed_time;
   EXPECT_FALSE(Time::FromString("Monday morning 2000", &parsed_time));
 }

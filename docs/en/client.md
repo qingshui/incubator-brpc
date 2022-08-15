@@ -42,7 +42,7 @@ int Init(EndPoint server_addr_and_port, const ChannelOptions* options);
 int Init(const char* server_addr_and_port, const ChannelOptions* options);
 int Init(const char* server_addr, int port, const ChannelOptions* options);
 ```
-The server connected by these Init() has fixed address generally. The creation does not need NamingService or LoadBalancer, being relatively light-weight.  The address could be a hostname, but don't frequently create Channels connecting to a hostname, which requires a DNS lookup taking at most 10 seconds. (default timeout of DNS lookup). Reuse them.
+The server connected by these Init() has fixed address genrally. The creation does not need NamingService or LoadBalancer, being relatively light-weight.  The address could be a hostname, but don't frequently create Channels connecting to a hostname, which requires a DNS lookup taking at most 10 seconds. (default timeout of DNS lookup). Reuse them.
 
 Valid "server_addr_and_port":
 - 127.0.0.1:80
@@ -93,10 +93,10 @@ Servers are put in the file specified by `path`. For example, in "file://conf/ma
  * brpc reloads the file when it's updated.
 ```
 # This line is ignored
-10.24.234.17:8080 tag1  # a comment
-10.24.234.17:8090 tag2  # an instance different from the instance on last line
-10.24.234.18:8080
-10.24.234.19:8080
+10.24.234.17 tag1  # a comment
+10.24.234.17 tag2  # an instance different from the instance on last line
+10.24.234.18
+10.24.234.19
 ```
 
 Pros: easy to modify, convenient for unittests.
@@ -123,10 +123,6 @@ Pros: Versatility of DNS, useable both in private or public network.
 
 Cons: limited by transmission formats of DNS, unable to implement notification mechanisms.
 
-### https://\<url\>
-
-Similar with "http" prefix besides that the connections will be encrypted with SSL.
-
 ### consul://\<service-name\>
 
 Get a list of servers with the specified service-name through consul. The default address of consul is localhost:8500, which can be modified by setting -consul\_agent\_addr in gflags. The connection timeout of consul is 200ms by default, which can be modified by -consul\_connect\_timeout\_ms. 
@@ -143,9 +139,7 @@ If consul is not accessible, the naming service can be automatically downgraded 
 User can extend to more naming services by implementing brpc::NamingService, check [this link](https://github.com/brpc/brpc/blob/master/docs/cn/load_balancing.md#%E5%91%BD%E5%90%8D%E6%9C%8D%E5%8A%A1) for details.
 
 ### The tag in naming service
-Every address can be attached with a tag. The common implementation is that if there're spaces after the address, the content after the spaces is the tag.
-Same address with different tag are treated as different instances which are interacted with separate connections. Users can use this feature to establish connections with remote servers in a more flexible way.
-If you need weighted round-robin, you should consider using [wrr algorithm](#wrr) first rather than emulate "a coarse-grained version" with tags.
+tag was used for implementing "coarse-grained wrr": different tags are appended to a same address to make different instances, such that the address gets traffic proportional to the number of different tags. However, you should consider using [wrr algorithm](#wrr) first which distributes traffic proportional to assigned weights and is more fine-grained.
 
 ### VIP related issues
 VIP is often the public IP of layer-4 load balancer, which proxies traffic to RS behide. When a client connects to the VIP, a connection is established to a chosen RS. When the client connection is broken, the connection to the RS is reset as well.
@@ -154,7 +148,7 @@ If one client establishes only one connection to the VIP("single" connection typ
 
 One solution to these issues is to use "pooled" connection type, so that one client may create multiple connections to one VIP (roughly the max concurrency recently) to make traffic land on different RS. If more than one VIP are present, consider using [wrr load balancing](#wrr) to assign weights to different VIP, or add different tags to VIP to form more instances.
 
-If higher performance is demanded, or number of connections is limited (in a large cluster), consider using single connection and attach same VIP with different tags to create different connections. Comparing to pooled connections, number of connections and overhead of syscalls are often lower, but if tags are not enough, RS hotspots may still present.
+Note: When the client uses "single" connection type, even if one VIP appended with different tags can get more traffic, the connection is still one. This is decided by current implementation in brpc.
 
 ### Naming Service Filter
 
@@ -216,17 +210,9 @@ which is round robin. Always choose next server inside the list, next of the las
 
 which is weighted round robin. Choose the next server according to the configured weight. The chances a server is selected is consistent with its weight, and the algorithm can make each server selection scattered.
 
-The instance tag must be an int32 number representing the weight, eg. tag="50".
-
 ### random
 
 Randomly choose one server from the list, no other settings. Similarly with round robin, the algorithm assumes that servers to access are similar.
-
-### wr
-
-which is weighted random. Choose the next server according to the configured weight. The chances a server is selected is consistent with its weight.
-
-Requirements of instance tag is the same as wrr.
 
 ### la
 
@@ -243,17 +229,6 @@ Need to set Controller.set_request_code() before RPC otherwise the RPC will fail
 Do distinguish "key" and "attributes" of the request. Don't compute request_code by full content of the request just for quick. Minor change in attributes may result in totally different hash code and change destination dramatically. Another cause is padding, for example: `struct Foo { int32_t a; int64_t b; }` has a 4-byte undefined gap between `a` and `b` on 64-bit machines, result of `hash(&foo, sizeof(foo))` is undefined. Fields need to be packed or serialized before hashing.
 
 Check out [Consistent Hashing](consistent_hashing.md) for more details.
-
-Other kind of lb does not need to set Controller.set_request_code(). If request code is set, it will not be used by lb. For example, lb=rr, and call Controller.set_request_code(), even if request_code is the same for every request, lb will balance the requests using the rr policy.
-
-### Client-side throttling for recovery from cluster downtime
-
-Cluster downtime refers to the state in which all servers in the cluster are unavailable. Due to the health check mechanism, when the cluster returns to normal, server will go online one by one. When a server is online, all traffic will be sent to it, which may cause the service to be overloaded again. If circuit breaker is enabled, server may be offline again before the other servers go online, and the cluster can never be recovered. As a solution, brpc provides a client-side throttling mechanism for recovery after cluster downtime. When no server is available in the cluster, the cluster enters recovery state. Assuming that the minimum number of servers that can serve all requests is min_working_instances, current number of servers available in the cluster is q, then in recovery state, the probability of client accepting the request is q/min_working_instances, otherwise it is discarded. If q remains unchanged for a period of time(hold_seconds), the traffic is resent to all available servers and leaves recovery state. Whether the request is rejected in recovery state is indicated by whether controller.ErrorCode() is equal to brpc::ERJECT, and the rejected request will not be retried by the framework.
-
-This recovery mechanism requires the capabilities of downstream servers to be similar, so it is currently only valid for rr and random. The way to enable it is to add the values of min_working_instances and hold_seconds parameters after *load_balancer_name*, for example:
-```c++
-channel.Init("http://...", "random:min_working_instances=6 hold_seconds=10", &options);
-```
 
 ## Health checking
 
@@ -276,7 +251,7 @@ Or even:
 ```c++
 XXX_Stub(&channel).some_method(controller, request, response, done);
 ```
-A exception is http/h2 client, which is not related to protobuf much. Call CallMethod directly to make a http call, setting all parameters to NULL except for `Controller` and `done`, check [Access http/h2](http_client.md) for details.
+A exception is http client, which is not related to protobuf much. Call CallMethod directly to make a http call, setting all parameters to NULL except for `Controller` and `done`, check [Access HTTP](http_client.md) for details.
 
 ## Synchronous call
 
@@ -299,12 +274,6 @@ if (cntl.Failed()) {
 }
 ```
 
-> WARNING: Do NOT use synchronous call when you are holding a pthread lock! Otherwise it is easy to cause deadlock.
-> 
-> Solution (choose one of the two):
-> 1. Replace pthread lock with bthread lock (bthread_mutex_t)
-> 1. Release the lock before CallMethod
-
 ## Asynchronous call
 
 Pass a callback `done` to CallMethod, which resumes after sending request, rather than completion of RPC. When the response from server is received  or error occurred(including timedout), done->Run() is called. Post-processing code of the RPC should be put in done->Run() instead of after CallMethod.
@@ -313,11 +282,7 @@ Because end of CallMethod does not mean completion of RPC, response/controller m
 
 You can new these objects individually and create done by [NewCallback](#use-newcallback), or make response/controller be member of done and [new them together](#Inherit-google::protobuf::Closure). Former one is recommended.
 
-Request can be destroyed immediately after asynchronous CallMethod. (SelectiveChannel is an exception, in the case of SelectiveChannel, the request object must be released after rpc finish)
-
-Channel can be destroyed immediately after asynchronous CallMethod.
-
-Note that "immediately" means destruction of Request/Channel can happen **after** CallMethod, not during CallMethod. Deleting a Channel just being used by another thread results in undefined behavior (crash at best).
+**Request and Channel can be destroyed immediately after asynchronous CallMethod**, which is different from response/controller. Note that "immediately" means destruction of request/Channel can happen **after** CallMethod, not during CallMethod. Deleting a Channel just being used by another thread results in undefined behavior (crash at best).
 
 ### Use NewCallback
 ```c++
@@ -340,7 +305,7 @@ MyService_Stub stub(&channel);
 MyRequest request;  // you don't have to new request, even in an asynchronous call.
 request.set_foo(...);
 cntl->set_timeout_ms(...);
-stub.some_method(cntl, &request, response, brpc::NewCallback(OnRPCDone, response, cntl));
+stub.some_method(cntl, &request, response, google::protobuf::NewCallback(OnRPCDone, response, cntl));
 ```
 Since protobuf 3 changes NewCallback to private, brpc puts NewCallback in [src/brpc/callback.h](https://github.com/brpc/brpc/blob/master/src/brpc/callback.h) after r32035 (and adds more overloads). If your program has compilation issues with NewCallback, replace google::protobuf::NewCallback with brpc::NewCallback.
 
@@ -531,21 +496,21 @@ There's **no** independent thread pool for client in brpc. All Channels and Serv
 
 **ChannelOptions.timeout_ms** is timeout in milliseconds for all RPCs via the Channel, Controller.set_timeout_ms() overrides value for one RPC. Default value is 1 second, Maximum value is 2^31 (about 24 days), -1 means wait indefinitely for response or connection error.
 
-**ChannelOptions.connect_timeout_ms** is the timeout in milliseconds for establishing connections of RPCs over the Channel, and -1 means no deadline. This value is limited to be not greater than timeout_ms. Note that this connection timeout is different from the one in TCP, generally this one is smaller.
+**ChannelOptions.connect_timeout_ms** is timeout in milliseconds for connecting part of all RPC via the Channel, Default value is 1 second, and -1 means no timeout for connecting. This value is limited to be never greater than timeout_ms. Note that this timeout is different from the connection timeout in TCP, generally this timeout is smaller otherwise establishment of the connection may fail before this timeout due to timeout in TCP layer.
 
-NOTE1: timeout_ms in brpc is **deadline**, which means once it's reached, the RPC ends without more retries. As a comparison, other implementations may have session timeouts and deadline timeouts. Do distinguish them before porting to brpc.
+NOTE1: timeout_ms in brpc is **deadline**, which means once it's reached, the RPC ends, no retries after the timeout. Other impl. may have session timeout and deadline timeout, do distinguish them before porting to brpc.
 
 NOTE2: error code of RPC timeout is **ERPCTIMEDOUT (1008) **, ETIMEDOUT is connection timeout and retriable.
 
 ## Retry
 
-ChannelOptions.max_retry is maximum retrying count for all RPC via the channel, Default value is 3, 0 means no retries. Controller.set_max_retry() overrides value for one RPC.
+ChannelOptions.max_retry is maximum retrying count for all RPC via the channel, Controller.set_max_retry() overrides value for one RPC. Default value is 3. 0 means no retries.
 
 Controller.retried_count() returns number of retries.
 
 Controller.has_backup_request() tells if backup_request was sent.
 
-**Servers tried before are not retried by best efforts**
+**servers tried before are not retried by best efforts**
 
 Conditions for retrying (AND relations):
 - Broken connection.
@@ -573,7 +538,7 @@ Controller.set_max_retry(0) or ChannelOptions.max_retry = 0 disables retries.
 
 If the RPC fails due to request(EREQUEST), no retry will be done because server is very likely to reject the request again, retrying makes no sense here.
 
-Users can inherit [brpc::RetryPolicy](https://github.com/brpc/brpc/blob/master/src/brpc/retry_policy.h) to customize conditions of retrying. For example brpc does not retry for http/h2 related errors by default. If you want to retry for HTTP_STATUS_FORBIDDEN(403) in your app, you can do as follows:
+Users can inherit [brpc::RetryPolicy](https://github.com/brpc/brpc/blob/master/src/brpc/retry_policy.h) to customize conditions of retrying. For example brpc does not retry for HTTP related errors by default. If you want to retry for HTTP_STATUS_FORBIDDEN(403) in your app, you can do as follows:
 
 ```c++
 #include <brpc/retry_policy.h>
@@ -581,7 +546,7 @@ Users can inherit [brpc::RetryPolicy](https://github.com/brpc/brpc/blob/master/s
 class MyRetryPolicy : public brpc::RetryPolicy {
 public:
     bool DoRetry(const brpc::Controller* cntl) const {
-        if (cntl->ErrorCode() == brpc::EHTTP && // http/h2 error
+        if (cntl->ErrorCode() == brpc::EHTTP && // HTTP error
             cntl->http_response().status_code() == brpc::HTTP_STATUS_FORBIDDEN) {
             return true;
         }
@@ -608,10 +573,6 @@ Some tips：
 
 Due to maintaining costs, even very large scale clusters are deployed with "just enough" instances to survive major defects, namely offline of one IDC, which is at most 1/2 of all machines. However aggressive retries may easily make pressures from all clients double or even tripple against servers, and make the whole cluster down: More and more requests stuck in buffers, because servers can't process them in-time. All requests have to wait for a very long time to be processed and finally gets timed out, as if the whole cluster is crashed. The default retrying policy is safe generally: unless the connection is broken, retries are rarely sent. However users are able to customize starting conditions for retries by inheriting RetryPolicy, which may turn retries to be "a storm". When you customized RetryPolicy, you need to carefully consider how clients and servers interact and design corresponding tests to verify that retries work as expected.
 
-## Circuit breaker
-
-Check out [circuit_breaker](../cn/circuit_breaker.md) for more details.
-
 ## Protocols
 
 The default protocol used by Channel is baidu_std, which is changeable by setting ChannelOptions.protocol. The field accepts both enum and string.
@@ -619,23 +580,16 @@ The default protocol used by Channel is baidu_std, which is changeable by settin
  Supported protocols:
 
 - PROTOCOL_BAIDU_STD or "baidu_std", which is [the standard binary protocol inside Baidu](baidu_std.md), using single connection by default.
-- PROTOCOL_HTTP or "http", which is http/1.0 or http/1.1, using pooled connection by default (Keep-Alive).
-  - Methods for accessing ordinary http services are listed in [Access http/h2](http_client.md).
-  - Methods for accessing pb services by using http:json or http:proto are listed in [http/h2 derivatives](http_derivatives.md)
-- PROTOCOL_H2 or ”h2", which is http/2, using single connection by default.
-  - Methods for accessing ordinary h2 services are listed in [Access http/h2](http_client.md).
-  - Methods for accessing pb services by using h2:json or h2:proto are listed in [http/h2 derivatives](http_derivatives.md)
-- "h2:grpc", which is the protocol of [gRPC](https://grpc.io) and based on h2, using single connection by default, check out [h2:grpc](http_derivatives.md#h2grpc) for details.
-- PROTOCOL_THRIFT or "thrift", which is the protocol of [apache thrift](https://thrift.apache.org), using pooled connection by default, check out [Access thrift](thrift.md) for details.
-- PROTOCOL_MEMCACHE or "memcache", which is binary protocol of memcached, using **single connection** by default. Check out [Access memcached](memcache_client.md) for details.
-- PROTOCOL_REDIS or "redis", which is protocol of redis 1.2+ (the one supported by hiredis), using **single connection** by default. Check out [Access Redis](redis_client.md) for details.
 - PROTOCOL_HULU_PBRPC or "hulu_pbrpc", which is protocol of hulu-pbrpc, using single connection by default.
 - PROTOCOL_NOVA_PBRPC or "nova_pbrpc",  which is protocol of Baidu ads union, using pooled connection by default.
+- PROTOCOL_HTTP or "http", which is http 1.0 or 1.1, using pooled connection by default (Keep-Alive). Check out [Access HTTP service](http_client.md) for details.
 - PROTOCOL_SOFA_PBRPC or "sofa_pbrpc", which is protocol of sofa-pbrpc, using single connection by default.
 - PROTOCOL_PUBLIC_PBRPC or "public_pbrpc", which is protocol of public_pbrpc, using pooled connection by default.
 - PROTOCOL_UBRPC_COMPACK or "ubrpc_compack", which is protocol of public/ubrpc, packing with compack, using pooled connection by default. check out [ubrpc (by protobuf)](ub_client.md) for details. A related protocol is PROTOCOL_UBRPC_MCPACK2 or ubrpc_mcpack2, packing with mcpack2.
 - PROTOCOL_NSHEAD_CLIENT or "nshead_client", which is required by UBXXXRequest in baidu-rpc-ub, using pooled connection by default. Check out [Access UB](ub_client.md) for details.
 - PROTOCOL_NSHEAD or "nshead", which is required by sending NsheadMessage, using pooled connection by default. Check out [nshead+blob](ub_client.md#nshead-blob) for details.
+- PROTOCOL_MEMCACHE or "memcache", which is binary protocol of memcached, using **single connection** by default. Check out [access memcached](memcache_client.md) for details.
+- PROTOCOL_REDIS or "redis", which is protocol of redis 1.2+ (the one supported by hiredis), using **single connection** by default. Check out [Access Redis](redis_client.md) for details.
 - PROTOCOL_NSHEAD_MCPACK or "nshead_mcpack", which is as the name implies, nshead + mcpack (parsed by protobuf via mcpack2pb), using pooled connection by default.
 - PROTOCOL_ESP or "esp", for accessing services with esp protocol, using pooled connection by default.
 
@@ -643,8 +597,8 @@ The default protocol used by Channel is baidu_std, which is changeable by settin
 
 brpc supports following connection types:
 
-- short connection: Established before each RPC, closed after completion. Since each RPC has to pay the overhead of establishing connection, this type is used for occasionally launched RPC, not frequently launched ones. No protocol use this type by default. Connections in http/1.0 are handled similarly as short connections.
-- pooled connection: Pick an unused connection from a pool before each RPC, return after completion. One connection carries at most one request at the same time. One client may have multiple connections to one server. http/1.1 and the protocols using nshead use this type by default.
+- short connection: Established before each RPC, closed after completion. Since each RPC has to pay the overhead of establishing connection, this type is used for occasionally launched RPC, not frequently launched ones. No protocol use this type by default. Connections in http 1.0 are handled similarly as short connections.
+- pooled connection: Pick an unused connection from a pool before each RPC, return after completion. One connection carries at most one request at the same time. One client may have multiple connections to one server.  http and the protocols using nshead use this type by default.
 - single connection: all clients in one process has at most one connection to one server, one connection may carry multiple requests at the same time. The sequence of received responses does not need to be same as sending requests. This type is used by baidu_std, hulu_pbrpc, sofa_pbrpc by default.
 
 |                                          | short connection                         | pooled connection                       | single connection                        |
@@ -659,11 +613,11 @@ brpc chooses best connection type for the protocol by default, users generally h
 
 - CONNECTION_TYPE_SINGLE or "single" : single connection
 
-- CONNECTION_TYPE_POOLED or "pooled": pooled connection. Max number of pooled connections from one client to one server is limited by -max_connection_pool_size. Note the number is not same as "max number of connections". New connections are always created when there's no idle ones in the pool; the returned connections are closed immediately when the pool already has max_connection_pool_size connections. Value of max_connection_pool_size should respect the concurrency, otherwise the connnections that can't be pooled are created and closed frequently which behaves similarly as short connections. If max_connection_pool_size is 0, the pool behaves just like fully short connections. 
+- CONNECTION_TYPE_POOLED or "pooled": pooled connection. Max number of connections from one client to one server is limited by -max_connection_pool_size:
 
   | Name                         | Value | Description                              | Defined At          |
   | ---------------------------- | ----- | ---------------------------------------- | ------------------- |
-  | max_connection_pool_size (R) | 100   | Max number of pooled connections to a single endpoint | src/brpc/socket.cpp |
+  | max_connection_pool_size (R) | 100   | maximum pooled connection count to a single endpoint | src/brpc/socket.cpp |
 
 - CONNECTION_TYPE_SHORT or "short" : short connection
 
@@ -715,32 +669,52 @@ baidu_std and hulu_pbrpc supports attachments which are sent along with messages
 
 Attachment is not compressed by framework.
 
-In http/h2, attachment corresponds to [message body](http://www.w3.org/Protocols/rfc2616/rfc2616-sec4.html), namely the data to post to server is stored in request_attachment().
+In http, attachment corresponds to [message body](http://www.w3.org/Protocols/rfc2616/rfc2616-sec4.html), namely the data to post to server is stored in request_attachment().
 
 ## Turn on SSL
 
-Update openssl to the latest version before turning on SSL, since older versions of openssl may have severe security problems and support less encryption algorithms, which is against with the purpose of using SSL. 
-Set ChannelOptions.mutable_ssl_options() to enable SSL. Refer to [ssl_options.h](https://github.com/brpc/brpc/blob/master/src/brpc/ssl_options.h) for the detailed options. ChannelOptions.has_ssl_options() checks if ssl_options was set; ChannelOptions.ssl_options() returns const reference to the ssl_options.
+Update openssl to the latest version before turning on SSL, since older versions of openssl may have severe security problems and support less encryption algorithms, which is against with the purpose of using SSL. Setup `ChannelOptions.ssl_options` to turn on SSL. Refer to [ssl_option.h](https://github.com/brpc/brpc/blob/master/src/brpc/ssl_option.h) for more details.
 
 ```c++
-// Enable client-side SSL and use default values.
-options.mutable_ssl_options();
-
-// Enable client-side SSL and customize values.
-options.mutable_ssl_options()->ciphers_name = "...";
-options.mutable_ssl_options()->sni_name = "...";
+// SSL options at client side
+struct ChannelSSLOptions {
+    // Whether to enable SSL on the channel.
+    // Default: false
+    bool enable;
+    
+    // Cipher suites used for SSL handshake.
+    // The format of this string should follow that in `man 1 cipers'.
+    // Default: "DEFAULT"
+    std::string ciphers;
+    
+    // SSL protocols used for SSL handshake, separated by comma.
+    // Available protocols: SSLv3, TLSv1, TLSv1.1, TLSv1.2
+    // Default: TLSv1, TLSv1.1, TLSv1.2
+    std::string protocols;
+    
+    // When set, fill this into the SNI extension field during handshake,
+    // which can be used by the server to locate the right certificate. 
+    // Default: empty
+    std::string sni_name;
+    
+    // Options used to verify the server's certificate
+    // Default: see above
+    VerifyOptions verify;
+    
+    // ... Other options
+};
 ```
 
-- Channels connecting to a single server or a cluster both support SSL (the initial implementation does not support cluster)
+- Currently only Channels which connect to a single server (by corresponding `Init`) support SSL request. Those connect to a cluster (using `NamingService`) **do NOT support SSL**.
 - After turning on SSL, all requests through this Channel will be encrypted. Users should create another Channel for non-SSL requests if needed.
-- Accessibility improvements for HTTPS: Channel.Init recognizes https:// prefix and turns on SSL automatically; -http_verbose prints certificate information when SSL is on.
+- Some accessibility optimization for HTTPS: `Channel.Init` recognize https:// prefix and turn on SSL automatically; -http_verbose will print certificate information if SSL connected.
 
 ## Authentication
 
 Generally there are 2 ways of authentication at the client side:
 
 1. Request-based authentication: Each request carries authentication information. It's more flexible since the authentication information can contain fields based on this particular request. However, this leads to a performance loss due to the extra payload in each request.
-2. Connection-based authentication: Once a TCP connection has been established, the client sends an authentication packet. After it has been verfied by the server, subsequent requests on this connection no longer needs authentication. Compared with the former, this method can only carry some static information such as local IP in the authentication packet. However, it has better performance especially under single connection / connection pool scenario.
+2. Connection-based authentication: Once a TCP connection has been established, the client sends an authentication packet. After it has been verfied by the server, subsequent requests on this connection no longer needs authentication. Compared with the former, this method can only some static information such as local IP in the authentication packet. However, it has better performance especially under single connection / connection pool scenario.
 
 It's very simple to implement the first method by just adding authentication data format into the request proto definition. Then send it as normal RPC in each request. To achieve the second one, brpc provides an interface for users to implement:
 
@@ -773,7 +747,7 @@ set_request_compress_type() sets compress-type of the request, no compression by
 
 NOTE: Attachment is not compressed by brpc.
 
-Check out [compress request body](http_client.md#compress-request-body) to compress http/h2 body.
+Check out [compress request body](http_client#压缩request-body) to compress http body.
 
 Supported compressions:
 

@@ -1,20 +1,18 @@
-// Licensed to the Apache Software Foundation (ASF) under one
-// or more contributor license agreements.  See the NOTICE file
-// distributed with this work for additional information
-// regarding copyright ownership.  The ASF licenses this file
-// to you under the Apache License, Version 2.0 (the
-// "License"); you may not use this file except in compliance
-// with the License.  You may obtain a copy of the License at
-//
-//   http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing,
-// software distributed under the License is distributed on an
-// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-// KIND, either express or implied.  See the License for the
-// specific language governing permissions and limitations
-// under the License.
+// Copyright (c) 2015 Baidu, Inc.
+// 
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+// 
+//     http://www.apache.org/licenses/LICENSE-2.0
+// 
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
+// Author: Ge,Jun (gejun@baidu.com)
 // Date: Thu Jul 30 17:44:54 CST 2015
 
 #include <unistd.h>                        // getpagesize
@@ -22,12 +20,6 @@
 #include <sys/resource.h>                  // getrusage
 #include <dirent.h>                        // dirent
 #include <iomanip>                         // setw
-#if defined(__APPLE__)
-#include <libproc.h>
-#include <sys/resource.h>
-#else
-#endif
-
 #include "butil/time.h"
 #include "butil/memory/singleton_on_pthread_once.h"
 #include "butil/scoped_lock.h"
@@ -35,8 +27,12 @@
 #include "butil/files/dir_reader_posix.h"
 #include "butil/file_util.h"
 #include "butil/process_util.h"            // ReadCommandLine
-#include "butil/popen.h"                   // read_command_output
+#include <butil/popen.h>                   // read_command_output
 #include "bvar/passive_status.h"
+#if defined(OS_MACOSX)
+#include <libproc.h>
+#include <sys/resource.h>
+#endif
 namespace brpc {
 namespace bvar {
 
@@ -199,8 +195,8 @@ struct ProcMemory {
     long resident;  // resident set size
     long share;     // shared pages
     long trs;       // text (code)
-    long lrs;       // library
     long drs;       // data/stack
+    long lrs;       // library
     long dt;        // dirty pages
 };
 
@@ -215,8 +211,8 @@ static bool read_proc_memory(ProcMemory &m) {
     }
     if (fscanf(fp, "%ld %ld %ld %ld %ld %ld %ld",
                &m.size, &m.resident, &m.share,
-               &m.trs, &m.lrs, &m.drs, &m.dt) != 7) {
-        PLOG(WARNING) << "Fail to fscanf /proc/self/statm";
+               &m.trs, &m.drs, &m.lrs, &m.dt) != 7) {
+        PLOG(WARNING) << "Fail to fscanf";
         return false;
     }
     return true;
@@ -448,7 +444,7 @@ static bool read_proc_io(ProcIO* s) {
     memset(s, 0, sizeof(ProcIO));
     static pid_t pid = getpid();
     rusage_info_current rusage;
-    if (proc_pid_rusage(pid, RUSAGE_INFO_CURRENT, (void**)&rusage) != 0) {
+    if (proc_pid_rusage(pid, RUSAGE_INFO_CURRENT, (void **)&rusage) != 0) {
         PLOG(WARNING) << "Fail to proc_pid_rusage";
         return false;
     }
@@ -561,12 +557,11 @@ static bool read_disk_stat(DiskStat* s) {
         PLOG(WARNING) << "Fail to fscanf";
         return false;
     }
-    return true;
 #elif defined(OS_MACOSX)
     // TODO(zhujiashun)
-    return false;
+    return true;
 #else
-    return false;
+    return true;
 #endif
 }
 
@@ -693,6 +688,8 @@ BVAR_DEFINE_PROC_MEMORY_FIELD(resident, "process_memory_resident");
 BVAR_DEFINE_PROC_MEMORY_FIELD(share, "process_memory_shared");
 BVAR_DEFINE_PROC_MEMORY_FIELD(trs, "process_memory_text");
 BVAR_DEFINE_PROC_MEMORY_FIELD(drs, "process_memory_data_and_stack");
+BVAR_DEFINE_PROC_MEMORY_FIELD(lrs, "process_memory_library");
+BVAR_DEFINE_PROC_MEMORY_FIELD(dt, "process_memory_dirty");
 
 BVAR_DEFINE_LOAD_AVERAGE_FIELD(loadavg_1m, "system_loadavg_1m");
 BVAR_DEFINE_LOAD_AVERAGE_FIELD(loadavg_5m, "system_loadavg_5m");
@@ -872,6 +869,7 @@ PassiveStatus<std::string> g_work_dir("process_work_dir", get_work_dir, NULL);
 
 }  // namespace bvar
 }
+
 // In the same scope where timeval is defined. Required by clang.
 inline std::ostream& operator<<(std::ostream& os, const timeval& tm) {
     return os << tm.tv_sec << '.' << std::setw(6) << std::setfill('0') << tm.tv_usec;

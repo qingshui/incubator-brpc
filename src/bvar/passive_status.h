@@ -1,20 +1,18 @@
-// Licensed to the Apache Software Foundation (ASF) under one
-// or more contributor license agreements.  See the NOTICE file
-// distributed with this work for additional information
-// regarding copyright ownership.  The ASF licenses this file
-// to you under the Apache License, Version 2.0 (the
-// "License"); you may not use this file except in compliance
-// with the License.  You may obtain a copy of the License at
-//
-//   http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing,
-// software distributed under the License is distributed on an
-// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-// KIND, either express or implied.  See the License for the
-// specific language governing permissions and limitations
-// under the License.
+// Copyright (c) 2014 Baidu, Inc.
+// 
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+// 
+//     http://www.apache.org/licenses/LICENSE-2.0
+// 
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
+// Author: Ge,Jun (gejun@baidu.com)
 // Date 2014/09/22 11:57:43
 
 #ifndef  BVAR_PASSIVE_STATUS_H
@@ -59,7 +57,7 @@ public:
         ~SeriesSampler() {
             delete _vector_names;
         }
-        void take_sample() override { _series.append(_owner->get_value()); }
+        void take_sample() { _series.append(_owner->get_value()); }
         void describe(std::ostream& os) { _series.describe(os, _vector_names); }
         void set_vector_names(const std::string& names) {
             if (_vector_names == NULL) {
@@ -122,12 +120,12 @@ public:
         return -1;
     }
 
-    void describe(std::ostream& os, bool /*quote_string*/) const override {
+    void describe(std::ostream& os, bool /*quote_string*/) const {
         os << get_value();
     }
 
 #ifdef BAIDU_INTERNAL
-    void get_value(boost::any* value) const override {
+    void get_value(boost::any* value) const {
         if (_getfn) {
             *value = _getfn(_arg);
         } else {
@@ -151,7 +149,7 @@ public:
     detail::AddTo<Tp> op() const { return detail::AddTo<Tp>(); }
     detail::MinusFrom<Tp> inv_op() const { return detail::MinusFrom<Tp>(); }
 
-    int describe_series(std::ostream& os, const SeriesOptions& options) const override {
+    int describe_series(std::ostream& os, const SeriesOptions& options) const {
         if (_series_sampler == NULL) {
             return 1;
         }
@@ -167,9 +165,10 @@ public:
     }
 
 protected:
+    // @Variable
     int expose_impl(const butil::StringPiece& prefix,
                     const butil::StringPiece& name,
-                    DisplayFilter display_filter) override {
+                    DisplayFilter display_filter) {
         const int rc = Variable::expose_impl(prefix, name, display_filter);
         if (ADDITIVE &&
             rc == 0 &&
@@ -219,7 +218,7 @@ public:
         hide();
     }
 
-    void describe(std::ostream& os, bool quote_string) const override {
+    void describe(std::ostream& os, bool quote_string) const {
         if (quote_string) {
             if (_print) {
                 os << '"';
@@ -277,4 +276,5 @@ public:
 
 }  // namespace bvar
 }
+
 #endif  //BVAR_PASSIVE_STATUS_H

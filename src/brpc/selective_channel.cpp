@@ -1,20 +1,18 @@
-// Licensed to the Apache Software Foundation (ASF) under one
-// or more contributor license agreements.  See the NOTICE file
-// distributed with this work for additional information
-// regarding copyright ownership.  The ASF licenses this file
-// to you under the Apache License, Version 2.0 (the
-// "License"); you may not use this file except in compliance
-// with the License.  You may obtain a copy of the License at
-//
-//   http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing,
-// software distributed under the License is distributed on an
-// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-// KIND, either express or implied.  See the License for the
-// specific language governing permissions and limitations
-// under the License.
+// Copyright (c) 2015 Baidu, Inc.
+// 
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+// 
+//     http://www.apache.org/licenses/LICENSE-2.0
+// 
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
+// Authors: Ge,Jun (gejun@baidu.com)
 
 #include <map>
 #include <gflags/gflags.h>
@@ -50,15 +48,13 @@ public:
 
     int CheckHealth(Socket* ptr) {
         if (ptr->health_check_count() == 0) {
-            LOG(INFO) << "Checking " << *chan << " chan=0x" << (void*)chan
-                      << " Fake" << *ptr;
+            LOG(INFO) << "Checking " << *chan;
         }
         return chan->CheckHealth();
     }
 
-    void AfterRevived(Socket* ptr) {
-        LOG(INFO) << "Revived " << *chan << " chan=0x" << (void*)chan
-                  << " Fake" << *ptr << " (Connectable)";
+    void AfterRevived(Socket*) {
+        LOG(INFO) << "Revived " << *chan;
     }
 };
 
@@ -112,7 +108,7 @@ public:
     explicit SubDone(Sender* owner)
         : _owner(owner)
         , _cid(INVALID_BTHREAD_ID)
-        , _peer_id(INVALID_SOCKET_ID) {
+        , _peer_id((SocketId)-1) {
     }
     ~SubDone() {}
     void Run();
@@ -189,7 +185,7 @@ int ChannelBalancer::AddChannel(ChannelBase* sub_channel,
     SocketOptions options;
     options.user = sub_chan;
     options.health_check_interval_s = FLAGS_channel_check_interval;
-
+            
     if (Socket::Create(options, &sock_id) != 0) {
         delete sub_chan;
         LOG(ERROR) << "Fail to create fake socket for sub channel";
@@ -203,7 +199,6 @@ int ChannelBalancer::AddChannel(ChannelBase* sub_channel,
         ptr->SetFailed();
         return -1;
     }
-    ptr->SetHCRelatedRefHeld(); // set held status
     _chan_map[sub_channel]= ptr.release();  // Add reference.
     if (handle) {
         *handle = sock_id;
@@ -224,7 +219,6 @@ void ChannelBalancer::RemoveAndDestroyChannel(SelectiveChannel::ChannelHandle ha
             CHECK_EQ(1UL, _chan_map.erase(sub->chan));
         }
         {
-            ptr->SetHCRelatedRefReleased(); // set released status to cancel health checking
             SocketUniquePtr ptr2(ptr.get()); // Dereference.
         }
         if (rc == 0) {
@@ -319,7 +313,6 @@ int Sender::IssueRPC(int64_t start_realtime_us) {
     // No need to count timeout. We already managed timeout in schan. If
     // timeout occurs, sub calls are canceled with ERPCTIMEDOUT.
     sub_cntl->_timeout_ms = -1;
-    sub_cntl->_real_timeout_ms = _main_cntl->timeout_ms();
 
     // Inherit following fields of _main_cntl.
     // TODO(gejun): figure out a better way to maintain these fields.
@@ -328,8 +321,6 @@ int Sender::IssueRPC(int64_t start_realtime_us) {
     sub_cntl->set_request_compress_type(_main_cntl->request_compress_type());
     sub_cntl->set_log_id(_main_cntl->log_id());
     sub_cntl->set_request_code(_main_cntl->request_code());
-    // Forward request attachment to the subcall
-    sub_cntl->request_attachment().append(_main_cntl->request_attachment());
     
     sel_out.channel()->CallMethod(_main_cntl->_method,
                                   &r.sub_done->_cntl,

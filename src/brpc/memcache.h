@@ -1,30 +1,32 @@
-// Licensed to the Apache Software Foundation (ASF) under one
-// or more contributor license agreements.  See the NOTICE file
-// distributed with this work for additional information
-// regarding copyright ownership.  The ASF licenses this file
-// to you under the Apache License, Version 2.0 (the
-// "License"); you may not use this file except in compliance
-// with the License.  You may obtain a copy of the License at
-//
-//   http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing,
-// software distributed under the License is distributed on an
-// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-// KIND, either express or implied.  See the License for the
-// specific language governing permissions and limitations
-// under the License.
+// Copyright (c) 2015 Baidu, Inc.
+// 
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+// 
+//     http://www.apache.org/licenses/LICENSE-2.0
+// 
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
+// Authors: Ge,Jun (gejun@baidu.com)
 
 #ifndef BRPC_MEMCACHE_H
 #define BRPC_MEMCACHE_H
 
 #include <string>
-#include <google/protobuf/message.h>
+#include <google/protobuf/stubs/common.h>
+#include <google/protobuf/generated_message_util.h>
+#include <google/protobuf/repeated_field.h>
+#include <google/protobuf/extension_set.h>
+#include <google/protobuf/generated_message_reflection.h>
+#include "google/protobuf/descriptor.pb.h"
 
 #include "butil/iobuf.h"
 #include "butil/strings/string_piece.h"
-#include "brpc/proto_base.pb.h"
 
 namespace brpc {
 
@@ -85,14 +87,8 @@ public:
 
     int pipelined_count() const { return _pipelined_count; }
 
-    butil::IOBuf& raw_buffer() { return _buf; }
-    const butil::IOBuf& raw_buffer() const { return _buf; }
-
     // Protobuf methods.
     MemcacheRequest* New() const;
-#if GOOGLE_PROTOBUF_VERSION >= 3006000
-    MemcacheRequest* New(::google::protobuf::Arena* arena) const override;
-#endif
     void CopyFrom(const ::google::protobuf::Message& from);
     void MergeFrom(const ::google::protobuf::Message& from);
     void CopyFrom(const MemcacheRequest& from);
@@ -109,9 +105,11 @@ public:
     int GetCachedSize() const { return _cached_size_; }
     
     static const ::google::protobuf::Descriptor* descriptor();
+    static const MemcacheRequest& default_instance();
+    ::google::protobuf::Metadata GetMetadata() const;
 
-protected:
-    ::google::protobuf::Metadata GetMetadata() const override;
+    butil::IOBuf& raw_buffer() { return _buf; }
+    const butil::IOBuf& raw_buffer() const { return _buf; }
     
 private:
     bool GetOrDelete(uint8_t command, const butil::StringPiece& key);
@@ -129,6 +127,14 @@ private:
     int _pipelined_count;
     butil::IOBuf _buf;
     mutable int _cached_size_;
+
+friend void protobuf_AddDesc_baidu_2frpc_2fmemcache_5fbase_2eproto_impl();
+friend void protobuf_AddDesc_baidu_2frpc_2fmemcache_5fbase_2eproto();
+friend void protobuf_AssignDesc_baidu_2frpc_2fmemcache_5fbase_2eproto();
+friend void protobuf_ShutdownFile_baidu_2frpc_2fmemcache_5fbase_2eproto();
+  
+    void InitAsDefaultInstance();
+    static MemcacheRequest* default_instance_;
 };
 
 // Response from Memcache.
@@ -196,16 +202,10 @@ public:
     bool PopDecrement(uint64_t* new_value, uint64_t* cas_value);
     bool PopTouch();
     bool PopVersion(std::string* version);
-    butil::IOBuf& raw_buffer() { return _buf; }
-    const butil::IOBuf& raw_buffer() const { return _buf; }
-    static const char* status_str(Status);
       
     // implements Message ----------------------------------------------
   
     MemcacheResponse* New() const;
-#if GOOGLE_PROTOBUF_VERSION >= 3006000
-    MemcacheResponse* New(::google::protobuf::Arena* arena) const override;
-#endif
     void CopyFrom(const ::google::protobuf::Message& from);
     void MergeFrom(const ::google::protobuf::Message& from);
     void CopyFrom(const MemcacheResponse& from);
@@ -222,9 +222,13 @@ public:
     int GetCachedSize() const { return _cached_size_; }
 
     static const ::google::protobuf::Descriptor* descriptor();
-
-protected:
+    static const MemcacheResponse& default_instance();
     ::google::protobuf::Metadata GetMetadata() const;
+
+    butil::IOBuf& raw_buffer() { return _buf; }
+    const butil::IOBuf& raw_buffer() const { return _buf; }
+
+    static const char* status_str(Status);
 
 private:
     bool PopCounter(uint8_t command, uint64_t* new_value, uint64_t* cas_value);
@@ -237,6 +241,14 @@ private:
     std::string _err;
     butil::IOBuf _buf;
     mutable int _cached_size_;
+
+friend void protobuf_AddDesc_baidu_2frpc_2fmemcache_5fbase_2eproto_impl();
+friend void protobuf_AddDesc_baidu_2frpc_2fmemcache_5fbase_2eproto();
+friend void protobuf_AssignDesc_baidu_2frpc_2fmemcache_5fbase_2eproto();
+friend void protobuf_ShutdownFile_baidu_2frpc_2fmemcache_5fbase_2eproto();
+  
+    void InitAsDefaultInstance();
+    static MemcacheResponse* default_instance_;
 };
 
 } // namespace brpc

@@ -1,20 +1,18 @@
-// Licensed to the Apache Software Foundation (ASF) under one
-// or more contributor license agreements.  See the NOTICE file
-// distributed with this work for additional information
-// regarding copyright ownership.  The ASF licenses this file
-// to you under the Apache License, Version 2.0 (the
-// "License"); you may not use this file except in compliance
-// with the License.  You may obtain a copy of the License at
-//
-//   http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing,
-// software distributed under the License is distributed on an
-// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-// KIND, either express or implied.  See the License for the
-// specific language governing permissions and limitations
-// under the License.
+// Copyright (c) 2014 Baidu, Inc.
+// 
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+// 
+//     http://www.apache.org/licenses/LICENSE-2.0
+// 
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
+// Authors: Ge,Jun (gejun@baidu.com)
 
 // A server to receive TrackMeRequest and send back TrackMeResponse.
 
@@ -26,11 +24,10 @@
 #include <butil/files/scoped_file.h>
 #include <brpc/trackme.pb.h>
 
-namespace brpc{
 DEFINE_string(bug_file, "./bugs", "A file containing revision and information of bugs");
 DEFINE_int32(port, 8877, "TCP Port of this server");
 DEFINE_int32(reporting_interval, 300, "Reporting interval of clients");
-};
+
 struct RevisionInfo {
     int64_t min_rev;
     int64_t max_rev;
@@ -74,7 +71,7 @@ public:
         if (request->has_rpc_version()) {
             _bugs->find(request->rpc_version(), response);
         } 
-        response->set_new_interval(brpc::FLAGS_reporting_interval);
+        response->set_new_interval(FLAGS_reporting_interval);
         butil::EndPoint server_addr;
         CHECK_EQ(0, butil::str2endpoint(request->server_addr().c_str(), &server_addr));
         // NOTE(gejun): The ip reported is inaccessible in many cases, use 
@@ -94,7 +91,7 @@ int main(int argc, char* argv[]) {
     brpc::Server server;
     server.set_version("trackme_server");
     BugsLoader bugs;
-    if (!bugs.start(brpc::FLAGS_bug_file)) {
+    if (!bugs.start(FLAGS_bug_file)) {
         LOG(ERROR) << "Fail to start BugsLoader";
         return -1;
     }
@@ -107,8 +104,8 @@ int main(int argc, char* argv[]) {
     brpc::ServerOptions options;
     // I've noticed that many connections do not report. Don't know the
     // root cause yet. Set the idle_time to keep connections clean.
-    options.idle_timeout_sec = brpc::FLAGS_reporting_interval * 2;
-    if (server.Start(brpc::FLAGS_port, &options) != 0) {
+    options.idle_timeout_sec = FLAGS_reporting_interval * 2;
+    if (server.Start(FLAGS_port, &options) != 0) {
         LOG(ERROR) << "Fail to start TrackMeServer";
         return -1;
     }

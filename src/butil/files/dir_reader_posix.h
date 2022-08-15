@@ -19,8 +19,6 @@
 
 #if defined(OS_LINUX)
 #include "butil/files/dir_reader_linux.h"
-#elif defined(__APPLE__)
-#include "butil/files/dir_reader_unix.h"
 #else
 #include "butil/files/dir_reader_fallback.h"
 #endif
@@ -29,8 +27,6 @@ namespace butil {
 
 #if defined(OS_LINUX)
 typedef DirReaderLinux DirReaderPosix;
-#elif defined(__APPLE__)
-typedef DirReaderUnix DirReaderPosix;
 #else
 typedef DirReaderFallback DirReaderPosix;
 #endif

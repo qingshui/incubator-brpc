@@ -1,23 +1,18 @@
-// Licensed to the Apache Software Foundation (ASF) under one
-// or more contributor license agreements.  See the NOTICE file
-// distributed with this work for additional information
-// regarding copyright ownership.  The ASF licenses this file
-// to you under the Apache License, Version 2.0 (the
-// "License"); you may not use this file except in compliance
-// with the License.  You may obtain a copy of the License at
-//
-//   http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing,
-// software distributed under the License is distributed on an
-// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-// KIND, either express or implied.  See the License for the
-// specific language governing permissions and limitations
-// under the License.
+// Copyright (c) 2015 Baidu, Inc.
+// 
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+// 
+//     http://www.apache.org/licenses/LICENSE-2.0
+// 
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
-
-
-#ifndef USE_MESALINK
+// Authors: Rujie Jiang (jiangrujie@baidu.com)
 
 #include <sys/socket.h>                // recv
 #include <openssl/ssl.h>
@@ -442,6 +437,10 @@ static int SetSSLOptions(SSL_CTX* ctx, const std::string& ciphers,
 }
 
 SSL_CTX* CreateClientSSLContext(const ChannelSSLOptions& options) {
+    if (!options.enable) {
+        return NULL;
+    }
+
     std::unique_ptr<SSL_CTX, FreeSSLCTX> ssl_ctx(
         SSL_CTX_new(SSLv23_client_method()));
     if (!ssl_ctx) {
@@ -771,68 +770,51 @@ int SSLDHInit() {
     return 0;
 }
 
-static std::string GetNextLevelSeparator(const char* sep) {
-    if (sep[0] != '\n') {
-        return sep;
-    }
-    const size_t left_len = strlen(sep + 1);
-    if (left_len == 0) {
-        return "\n ";
-    }
-    std::string new_sep;
-    new_sep.reserve(left_len * 2 + 1);
-    new_sep.append(sep, left_len + 1);
-    new_sep.append(sep + 1, left_len);
-    return new_sep;
-}
+} // namespace brpc
 
-void Print(std::ostream& os, SSL* ssl, const char* sep) {
-    os << "cipher=" << SSL_get_cipher(ssl) << sep
-       << "protocol=" << SSL_get_version(ssl) << sep
-       << "verify=" << (SSL_get_verify_mode(ssl) & SSL_VERIFY_PEER
-                        ? "success" : "none");
+std::ostream& operator<<(std::ostream& os, SSL* ssl) {
+    os << "[SSL HANDSHAKE]"
+       << "\n* cipher: " << SSL_get_cipher(ssl)
+       << "\n* protocol: " << SSL_get_version(ssl)
+       << "\n* verify: " << (SSL_get_verify_mode(ssl) & SSL_VERIFY_PEER
+                             ? "success" : "none")
+       << "\n";
+
     X509* cert = SSL_get_peer_certificate(ssl);
     if (cert) {
-        os << sep << "peer_certificate={";
-        const std::string new_sep = GetNextLevelSeparator(sep);
-        if (sep[0] == '\n') {
-            os << new_sep;
-        }
-        Print(os, cert, new_sep.c_str());
-        if (sep[0] == '\n') {
-            os << sep;
-        }
-        os << '}';
+        os << "\n" << cert;
     }
+    return os;
 }
 
-void Print(std::ostream& os, X509* cert, const char* sep) {
+std::ostream& operator<<(std::ostream& os, X509* cert) {
     BIO* buf = BIO_new(BIO_s_mem());
     if (buf == NULL) {
-        return;
+        return os;
     }
-    BIO_printf(buf, "subject=");
+    BIO_printf(buf, "[CERTIFICATE]");
+
+    BIO_printf(buf, "\n* subject: ");
     X509_NAME_print(buf, X509_get_subject_name(cert), 0);
-    BIO_printf(buf, "%sstart_date=", sep);
+    BIO_printf(buf, "\n* start date: ");
     ASN1_TIME_print(buf, X509_get_notBefore(cert));
-    BIO_printf(buf, "%sexpire_date=", sep);
+    BIO_printf(buf, "\n* expire date: ");
     ASN1_TIME_print(buf, X509_get_notAfter(cert));
 
-    BIO_printf(buf, "%scommon_name=", sep);
+    BIO_printf(buf, "\n* common name: ");
     std::vector<std::string> hostnames;
     brpc::ExtractHostnames(cert, &hostnames);
     for (size_t i = 0; i < hostnames.size(); ++i) {
-        BIO_printf(buf, "%s;", hostnames[i].c_str());
+        BIO_printf(buf, "%s; ", hostnames[i].c_str());
     }
 
-    BIO_printf(buf, "%sissuer=", sep);
+    BIO_printf(buf, "\n* issuer: ");
     X509_NAME_print(buf, X509_get_issuer_name(cert), 0);
+
+    BIO_printf(buf, "\n");
 
     char* bufp = NULL;
     int len = BIO_get_mem_data(buf, &bufp);
     os << butil::StringPiece(bufp, len);
+    return os;
 }
-
-} // namespace brpc
-
-#endif // USE_MESALINK

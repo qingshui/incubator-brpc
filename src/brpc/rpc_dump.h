@@ -1,20 +1,18 @@
-// Licensed to the Apache Software Foundation (ASF) under one
-// or more contributor license agreements.  See the NOTICE file
-// distributed with this work for additional information
-// regarding copyright ownership.  The ASF licenses this file
-// to you under the Apache License, Version 2.0 (the
-// "License"); you may not use this file except in compliance
-// with the License.  You may obtain a copy of the License at
-//
-//   http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing,
-// software distributed under the License is distributed on an
-// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-// KIND, either express or implied.  See the License for the
-// specific language governing permissions and limitations
-// under the License.
+// Copyright (c) 2015 Baidu, Inc.
+// 
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+// 
+//     http://www.apache.org/licenses/LICENSE-2.0
+// 
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
+// Authors: Ge,Jun (gejun@baidu.com)
 
 #ifndef BRPC_RPC_DUMP_H
 #define BRPC_RPC_DUMP_H
@@ -23,11 +21,12 @@
 #include "butil/iobuf.h"                            // IOBuf
 #include "butil/files/file_path.h"                  // FilePath
 #include "bvar/collector.h"
-#include "brpc/rpc_dump.pb.h"                       // RpcDumpMeta
+#include "brpc/rpc_dump.pb.h"                 // RpcDumpMeta
 
 namespace butil {
 class FileEnumerator;
 }
+
 
 namespace brpc {
 
@@ -47,15 +46,14 @@ DECLARE_bool(rpc_dump);
 // In practice, sampled requests are just small fraction of all requests.
 // The overhead of sampling should be negligible for overall performance.
 
-class SampledRequest : public bvar::Collected {
-public:
+struct SampledRequest : public bvar::Collected
+                      , public RpcDumpMeta {
     butil::IOBuf request;
-    RpcDumpMeta meta;
 
     // Implement methods of Sampled.
-    void dump_and_destroy(size_t round) override;
-    void destroy() override;
-    bvar::CollectorSpeedLimit* speed_limit() override {
+    void dump_and_destroy(size_t round);
+    void destroy();
+    bvar::CollectorSpeedLimit* speed_limit() {
         extern bvar::CollectorSpeedLimit g_rpc_dump_sl;
         return &g_rpc_dump_sl;
     }
@@ -75,7 +73,7 @@ inline SampledRequest* AskToBeSampled() {
 // Read samples from dumped files in a directory.
 // Example:
 //   SampleIterator it("./rpc_dump_echo_server");
-//   for (SampledRequest* req = it->Next(); req != NULL; req = it->Next()) {
+//   for (SampleRequest* req = it->Next(); req != NULL; req = it->Next()) {
 //     ...
 //   }
 class SampleIterator {

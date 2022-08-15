@@ -1,22 +1,19 @@
-// Licensed to the Apache Software Foundation (ASF) under one
-// or more contributor license agreements.  See the NOTICE file
-// distributed with this work for additional information
-// regarding copyright ownership.  The ASF licenses this file
-// to you under the Apache License, Version 2.0 (the
-// "License"); you may not use this file except in compliance
-// with the License.  You may obtain a copy of the License at
-//
-//   http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing,
-// software distributed under the License is distributed on an
-// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-// KIND, either express or implied.  See the License for the
-// specific language governing permissions and limitations
-// under the License.
-
 // bthread - A M:N threading library to make applications more concurrent.
+// Copyright (c) 2014 Baidu, Inc.
+// 
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+// 
+//     http://www.apache.org/licenses/LICENSE-2.0
+// 
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
+// Author: Ge,Jun (gejun@baidu.com)
 // Date: Sun Aug  3 12:46:15 CST 2014
 
 #include <pthread.h>
@@ -446,14 +443,10 @@ int bthread_setspecific(bthread_key_t key, void* data) {
         bthread::TaskGroup* const g = bthread::tls_task_group;
         if (g) {
             g->current_task()->local_storage.keytable = kt;
-        } else {
-            // Only cleanup keytable created by pthread.
-            // keytable created by bthread will be deleted
-            // in `return_keytable' or `bthread_keytable_pool_destroy'.
-            if (!bthread::tls_ever_created_keytable) {
-                bthread::tls_ever_created_keytable = true;
-                CHECK_EQ(0, butil::thread_atexit(bthread::cleanup_pthread, kt));
-            }
+        }
+        if (!bthread::tls_ever_created_keytable) {
+            bthread::tls_ever_created_keytable = true;
+            CHECK_EQ(0, butil::thread_atexit(bthread::cleanup_pthread, kt));
         }
     }
     return kt->set_data(key, data);
@@ -479,6 +472,10 @@ void* bthread_getspecific(bthread_key_t key) {
 
 void bthread_assign_data(void* data) {
     bthread::tls_bls.assigned_data = data;
+    bthread::TaskGroup* const g = bthread::tls_task_group;
+    if (g) {
+        g->current_task()->local_storage.assigned_data = data;
+    }
 }
 
 void* bthread_get_assigned_data() {

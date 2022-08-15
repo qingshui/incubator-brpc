@@ -1,20 +1,18 @@
-// Licensed to the Apache Software Foundation (ASF) under one
-// or more contributor license agreements.  See the NOTICE file
-// distributed with this work for additional information
-// regarding copyright ownership.  The ASF licenses this file
-// to you under the Apache License, Version 2.0 (the
-// "License"); you may not use this file except in compliance
-// with the License.  You may obtain a copy of the License at
-//
-//   http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing,
-// software distributed under the License is distributed on an
-// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-// KIND, either express or implied.  See the License for the
-// specific language governing permissions and limitations
-// under the License.
+// Copyright (c) 2014 Baidu, Inc.
+// 
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+// 
+//     http://www.apache.org/licenses/LICENSE-2.0
+// 
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
+// Authors: Ge,Jun (gejun@baidu.com)
 
 #ifndef BRPC_INPUT_MESSENGER_H
 #define BRPC_INPUT_MESSENGER_H
@@ -26,6 +24,10 @@
 
 
 namespace brpc {
+namespace rdma {
+class RdmaCompletionQueue;
+class RdmaEndpoint;
+}
 
 struct InputMessageHandler {
     // The callback to cut a message from `source'.
@@ -70,6 +72,8 @@ struct InputMessageHandler {
 // Process messages from connections.
 // `Message' corresponds to a client's request or a server's response.
 class InputMessenger : public SocketUser {
+friend class rdma::RdmaEndpoint;
+friend class rdma::RdmaCompletionQueue;
 public:
     explicit InputMessenger(size_t capacity = 128);
     ~InputMessenger();
@@ -107,6 +111,29 @@ protected:
     static void OnNewMessages(Socket* m);
     
 private:
+    class InputMessageClosure {
+    public:
+        InputMessageClosure() : _msg(NULL) { }
+        ~InputMessageClosure();
+        InputMessageBase* release() {
+            InputMessageBase* m = _msg;
+            _msg = NULL;
+            return m;
+        }
+        void reset(InputMessageBase* m);
+    private:
+        InputMessageBase* _msg;
+    };
+
+    // Process data just received in Socket m
+    //   bytes: the received data size
+    //   read_eof: whether the Socket has read EOF already or not
+    //   last_msg: an InputMessageClosure used for processing in the current bthread
+    //             must be a reference!!!
+    int ProcessReceivedData(
+            Socket* m, ssize_t bytes, bool read_eof,
+            InputMessageClosure& last_msg);
+
     // Find a valid scissor from `handlers' to cut off `header' and `payload'
     // from m->read_buf, save index of the scissor into `index'.
     ParseResult CutInputMessage(Socket* m, size_t* index, bool read_eof);

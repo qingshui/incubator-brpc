@@ -1,22 +1,19 @@
-// Licensed to the Apache Software Foundation (ASF) under one
-// or more contributor license agreements.  See the NOTICE file
-// distributed with this work for additional information
-// regarding copyright ownership.  The ASF licenses this file
-// to you under the Apache License, Version 2.0 (the
-// "License"); you may not use this file except in compliance
-// with the License.  You may obtain a copy of the License at
-//
-//   http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing,
-// software distributed under the License is distributed on an
-// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-// KIND, either express or implied.  See the License for the
-// specific language governing permissions and limitations
-// under the License.
-
 // bthread - A M:N threading library to make applications more concurrent.
+// Copyright (c) 2015 Baidu, Inc.
+// 
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+// 
+//     http://www.apache.org/licenses/LICENSE-2.0
+// 
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
+// Author: Zhangyi Chen (chenzhangyi01@baidu.com)
 // Date: 2015/12/14 18:17:04
 
 #ifndef  BTHREAD_MUTEX_H
@@ -45,20 +42,10 @@ namespace bthread {
 class Mutex {
 public:
     typedef bthread_mutex_t* native_handler_type;
-    Mutex() {
-        int ec = bthread_mutex_init(&_mutex, NULL);
-        if (ec != 0) {
-            throw std::system_error(std::error_code(ec, std::system_category()), "Mutex constructor failed");
-        }
-    }
+    Mutex() { CHECK_EQ(0, bthread_mutex_init(&_mutex, NULL)); }
     ~Mutex() { CHECK_EQ(0, bthread_mutex_destroy(&_mutex)); }
     native_handler_type native_handler() { return &_mutex; }
-    void lock() {
-        int ec = bthread_mutex_lock(&_mutex);
-        if (ec != 0) {
-            throw std::system_error(std::error_code(ec, std::system_category()), "Mutex lock failed");
-        }
-    }
+    void lock() { bthread_mutex_lock(&_mutex); }
     void unlock() { bthread_mutex_unlock(&_mutex); }
     bool try_lock() { return !bthread_mutex_trylock(&_mutex); }
     // TODO(chenzhangyi01): Complement interfaces for C++11
@@ -205,7 +192,7 @@ private:
 };
 
 }  // namespace std
-namespace brpc {
+
 namespace bvar {
 
 template <>
@@ -223,6 +210,5 @@ struct MutexDestructor<bthread_mutex_t> {
 };
 
 }  // namespace bvar
-}
 
 #endif  //BTHREAD_MUTEX_H

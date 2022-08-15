@@ -1,19 +1,16 @@
-// Licensed to the Apache Software Foundation (ASF) under one
-// or more contributor license agreements.  See the NOTICE file
-// distributed with this work for additional information
-// regarding copyright ownership.  The ASF licenses this file
-// to you under the Apache License, Version 2.0 (the
-// "License"); you may not use this file except in compliance
-// with the License.  You may obtain a copy of the License at
-//
-//   http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing,
-// software distributed under the License is distributed on an
-// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-// KIND, either express or implied.  See the License for the
-// specific language governing permissions and limitations
-// under the License.
+// Copyright (c) 2014 Baidu, Inc.
+// 
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+// 
+//     http://www.apache.org/licenses/LICENSE-2.0
+// 
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 // A server to receive HttpRequest and send back HttpResponse.
 
@@ -69,20 +66,17 @@ public:
     FileServiceImpl() {};
     virtual ~FileServiceImpl() {};
 
-    struct Args {
-        butil::intrusive_ptr<brpc::ProgressiveAttachment> pa;
-    };
-
-    static void* SendLargeFile(void* raw_args) {
-        std::unique_ptr<Args> args(static_cast<Args*>(raw_args));
-        if (args->pa == NULL) {
+    static void* SendLargeFile(void* arg) {
+        butil::intrusive_ptr<brpc::ProgressiveAttachment> pa(
+                (brpc::ProgressiveAttachment*)arg);
+        if (pa == NULL) {
             LOG(ERROR) << "ProgressiveAttachment is NULL";
             return NULL;
         }
         for (int i = 0; i < 100; ++i) {
             char buf[16];
             int len = snprintf(buf, sizeof(buf), "part_%d ", i);
-            args->pa->Write(buf, len);
+            pa->Write(buf, len);
 
             // sleep a while to send another part.
             bthread_usleep(10000);
@@ -100,10 +94,9 @@ public:
         const std::string& filename = cntl->http_request().unresolved_path();
         if (filename == "largefile") {
             // Send the "largefile" with ProgressiveAttachment.
-            std::unique_ptr<Args> args(new Args);
-            args->pa = cntl->CreateProgressiveAttachment();
             bthread_t th;
-            bthread_start_background(&th, NULL, SendLargeFile, args.release());
+            bthread_start_background(&th, NULL, SendLargeFile, 
+                    cntl->CreateProgressiveAttachment());
         } else {
             cntl->response_attachment().append("Getting file: ");
             cntl->response_attachment().append(filename);
@@ -191,9 +184,9 @@ int main(int argc, char* argv[]) {
     // Start the server.
     brpc::ServerOptions options;
     options.idle_timeout_sec = FLAGS_idle_timeout_s;
-    options.mutable_ssl_options()->default_cert.certificate = FLAGS_certificate;
-    options.mutable_ssl_options()->default_cert.private_key = FLAGS_private_key;
-    options.mutable_ssl_options()->ciphers = FLAGS_ciphers;
+    options.ssl_options.default_cert.certificate = FLAGS_certificate;
+    options.ssl_options.default_cert.private_key = FLAGS_private_key;
+    options.ssl_options.ciphers = FLAGS_ciphers;
     if (server.Start(FLAGS_port, &options) != 0) {
         LOG(ERROR) << "Fail to start HttpServer";
         return -1;

@@ -1,20 +1,18 @@
-// Licensed to the Apache Software Foundation (ASF) under one
-// or more contributor license agreements.  See the NOTICE file
-// distributed with this work for additional information
-// regarding copyright ownership.  The ASF licenses this file
-// to you under the Apache License, Version 2.0 (the
-// "License"); you may not use this file except in compliance
-// with the License.  You may obtain a copy of the License at
-//
-//   http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing,
-// software distributed under the License is distributed on an
-// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-// KIND, either express or implied.  See the License for the
-// specific language governing permissions and limitations
-// under the License.
+// Copyright (c) 2014 Baidu, Inc.
+// 
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+// 
+//     http://www.apache.org/licenses/LICENSE-2.0
+// 
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
+// Authors: Ge,Jun (gejun@baidu.com)
 
 #include <set>
 #include <pthread.h>
@@ -30,28 +28,17 @@
 namespace brpc {
 
 struct NSKey {
-    std::string protocol;
+    const NamingService* ns;
     std::string service_name;
-    ChannelSignature channel_signature;
-
-    NSKey(const std::string& prot_in,
-          const std::string& service_in,
-          const ChannelSignature& sig)
-        : protocol(prot_in), service_name(service_in), channel_signature(sig) {
-    }
 };
 struct NSKeyHasher {
     size_t operator()(const NSKey& nskey) const {
-        size_t h = butil::DefaultHasher<std::string>()(nskey.protocol);
-        h = h * 101 + butil::DefaultHasher<std::string>()(nskey.service_name);
-        h = h * 101 + nskey.channel_signature.data[1];
-        return h;
+        return butil::DefaultHasher<std::string>()(nskey.service_name)
+            * 101 + (uintptr_t)nskey.ns;
     }
 };
 inline bool operator==(const NSKey& k1, const NSKey& k2) {
-    return k1.protocol == k2.protocol &&
-        k1.service_name == k2.service_name &&
-        k1.channel_signature == k2.channel_signature;
+    return (k1.ns == k2.ns && k1.service_name == k2.service_name);
 }
 
 typedef butil::FlatMap<NSKey, NamingServiceThread*, NSKeyHasher> NamingServiceMap;
@@ -71,8 +58,10 @@ NamingServiceThread::Actions::~Actions() {
     // Remove all sockets from SocketMap
     for (std::vector<ServerNode>::const_iterator it = _last_servers.begin();
          it != _last_servers.end(); ++it) {
-        const SocketMapKey key(*it, _owner->_options.channel_signature);
-        SocketMapRemove(key);
+        SocketMapRemove(SocketMapKey(it->addr));
+#ifdef BRPC_RDMA
+        SocketMapRemove(SocketMapKey(it->addr, true));
+#endif
     }
     EndWait(0);
 }
@@ -121,21 +110,35 @@ void NamingServiceThread::Actions::ResetServers(
     for (size_t i = 0; i < _added.size(); ++i) {
         ServerNodeWithId tagged_id;
         tagged_id.node = _added[i];
+        tagged_id.node.use_rdma = false;
         // TODO: For each unique SocketMapKey (i.e. SSL settings), insert a new
         //       Socket. SocketMapKey may be passed through AddWatcher. Make sure
         //       to pick those Sockets with the right settings during OnAddedServers
-        const SocketMapKey key(_added[i], _owner->_options.channel_signature);
-        CHECK_EQ(0, SocketMapInsert(key, &tagged_id.id, _owner->_options.ssl_ctx));
+        CHECK_EQ(SocketMapInsert(SocketMapKey(_added[i].addr), &tagged_id.id), 0);
         _added_sockets.push_back(tagged_id);
+#ifdef BRPC_RDMA
+        // add socket for RDMA
+        tagged_id.node = _added[i];
+        tagged_id.node.use_rdma = true;
+        CHECK_EQ(SocketMapInsert(SocketMapKey(_added[i].addr, true), &tagged_id.id), 0);
+        _added_sockets.push_back(tagged_id);
+#endif
     }
 
     _removed_sockets.clear();
     for (size_t i = 0; i < _removed.size(); ++i) {
         ServerNodeWithId tagged_id;
         tagged_id.node = _removed[i];
-        const SocketMapKey key(_removed[i], _owner->_options.channel_signature);
-        CHECK_EQ(0, SocketMapFind(key, &tagged_id.id));
+        tagged_id.node.use_rdma = false;
+        CHECK_EQ(0, SocketMapFind(SocketMapKey(_removed[i].addr), &tagged_id.id));
         _removed_sockets.push_back(tagged_id);
+#ifdef BRPC_RDMA
+        // remove socket for RDMA
+        tagged_id.node = _removed[i];
+        tagged_id.node.use_rdma = true;
+        CHECK_EQ(0, SocketMapFind(SocketMapKey(_removed[i].addr, true), &tagged_id.id));
+        _removed_sockets.push_back(tagged_id);
+#endif
     }
 
     // Refresh sockets
@@ -160,7 +163,8 @@ void NamingServiceThread::Actions::ResetServers(
                            _sockets.end());
     }
     std::vector<ServerId> removed_ids;
-    ServerNodeWithId2ServerId(_removed_sockets, &removed_ids, NULL);
+    ServerNodeWithId2ServerId(_removed_sockets, &removed_ids, NULL,
+                              _owner->_options.use_rdma);
 
     {
         BAIDU_SCOPED_LOCK(_owner->_mutex);
@@ -175,7 +179,8 @@ void NamingServiceThread::Actions::ResetServers(
             }
 
             std::vector<ServerId> added_ids;
-            ServerNodeWithId2ServerId(_added_sockets, &added_ids, it->second);
+            ServerNodeWithId2ServerId(_added_sockets, &added_ids, it->second,
+                                      _owner->_options.use_rdma);
             if (!_added_sockets.empty()) {
                 it->first->OnAddedServers(added_ids);
             }
@@ -185,8 +190,10 @@ void NamingServiceThread::Actions::ResetServers(
     for (size_t i = 0; i < _removed.size(); ++i) {
         // TODO: Remove all Sockets that have the same address in SocketMapKey.peer
         //       We may need another data structure to avoid linear cost
-        const SocketMapKey key(_removed[i], _owner->_options.channel_signature);
-        SocketMapRemove(key);
+        SocketMapRemove(SocketMapKey(_removed[i].addr));
+#ifdef BRPC_RDMA
+        SocketMapRemove(SocketMapKey(_removed[i].addr, true));
+#endif
     }
 
     if (!_removed.empty() || !_added.empty()) {
@@ -224,6 +231,7 @@ int NamingServiceThread::Actions::WaitForFirstBatchOfServers() {
 
 NamingServiceThread::NamingServiceThread()
     : _tid(0)
+    , _source_ns(NULL)
     , _ns(NULL)
     , _actions(this) {
 }
@@ -231,8 +239,8 @@ NamingServiceThread::NamingServiceThread()
 NamingServiceThread::~NamingServiceThread() {
     RPC_VLOG << "~NamingServiceThread(" << *this << ')';
     // Remove from g_nsthread_map first
-    if (!_protocol.empty()) {
-        const NSKey key(_protocol, _service_name, _options.channel_signature);
+    if (_source_ns != NULL) {
+        const NSKey key = { _source_ns, _service_name };
         std::unique_lock<pthread_mutex_t> mu(g_nsthread_map_mutex);
         if (g_nsthread_map != NULL) {
             NamingServiceThread** ptr = g_nsthread_map->seek(key);
@@ -249,7 +257,8 @@ NamingServiceThread::~NamingServiceThread() {
     {
         BAIDU_SCOPED_LOCK(_mutex);
         std::vector<ServerId> to_be_removed;
-        ServerNodeWithId2ServerId(_last_sockets, &to_be_removed, NULL);
+        ServerNodeWithId2ServerId(_last_sockets, &to_be_removed, NULL,
+                                  _options.use_rdma);
         if (!_last_sockets.empty()) {
             for (std::map<NamingServiceWatcher*,
                           const NamingServiceFilter*>::iterator
@@ -271,16 +280,15 @@ void* NamingServiceThread::RunThis(void* arg) {
     return NULL;
 }
 
-int NamingServiceThread::Start(NamingService* naming_service,
-                               const std::string& protocol,
+int NamingServiceThread::Start(const NamingService* naming_service,
                                const std::string& service_name,
                                const GetNamingServiceThreadOptions* opt_in) {
     if (naming_service == NULL) {
         LOG(ERROR) << "Param[naming_service] is NULL";
         return -1;
     }
-    _ns = naming_service;
-    _protocol = protocol;
+    _source_ns = naming_service;
+    _ns = naming_service->New();
     _service_name = service_name;
     if (opt_in) {
         _options = *opt_in;
@@ -316,11 +324,15 @@ int NamingServiceThread::WaitForFirstBatchOfServers() {
 
 void NamingServiceThread::ServerNodeWithId2ServerId(
     const std::vector<ServerNodeWithId>& src,
-    std::vector<ServerId>* dst, const NamingServiceFilter* filter) {
+    std::vector<ServerId>* dst, const NamingServiceFilter* filter,
+    bool use_rdma) {
     dst->reserve(src.size());
     for (std::vector<ServerNodeWithId>::const_iterator
              it = src.begin(); it != src.end(); ++it) {
         if (filter && !filter->Accept(it->node)) {
+            continue;
+        }
+        if (it->node.use_rdma != use_rdma) {
             continue;
         }
         ServerId socket;
@@ -337,10 +349,11 @@ int NamingServiceThread::AddWatcher(NamingServiceWatcher* watcher,
         return -1;
     }
     BAIDU_SCOPED_LOCK(_mutex);
-    if (_watchers.emplace(watcher, filter).second) {
+    if (_watchers.insert(std::make_pair(watcher, filter)).second) {
         if (!_last_sockets.empty()) {
             std::vector<ServerId> added_ids;
-            ServerNodeWithId2ServerId(_last_sockets, &added_ids, filter);
+            ServerNodeWithId2ServerId(_last_sockets, &added_ids, filter,
+                                      _options.use_rdma);
             watcher->OnAddedServers(added_ids);
         }
         return 0;
@@ -417,13 +430,14 @@ int GetNamingServiceThread(
         LOG(ERROR) << "Invalid naming service url=" << url;
         return -1;
     }
-    const NamingService* source_ns = NamingServiceExtension()->Find(protocol);
-    if (source_ns == NULL) {
+    const NamingService* ns = NamingServiceExtension()->Find(protocol);
+    if (ns == NULL) {
         LOG(ERROR) << "Unknown protocol=" << protocol;
         return -1;
     }
-    const NSKey key(protocol, service_name,
-                    (options ? options->channel_signature : ChannelSignature()));
+    NSKey key;
+    key.ns = ns;
+    key.service_name = service_name;
     bool new_thread = false;
     butil::intrusive_ptr<NamingServiceThread> nsthread;
     {
@@ -468,7 +482,7 @@ int GetNamingServiceThread(
         }
     }
     if (new_thread) {
-        if (nsthread->Start(source_ns->New(), key.protocol, key.service_name, options) != 0) {
+        if (nsthread->Start(ns, key.service_name, options) != 0) {
             LOG(ERROR) << "Fail to start NamingServiceThread";
             std::unique_lock<pthread_mutex_t> mu(g_nsthread_map_mutex);
             g_nsthread_map->erase(key);

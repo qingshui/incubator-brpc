@@ -1,22 +1,19 @@
-// Licensed to the Apache Software Foundation (ASF) under one
-// or more contributor license agreements.  See the NOTICE file
-// distributed with this work for additional information
-// regarding copyright ownership.  The ASF licenses this file
-// to you under the Apache License, Version 2.0 (the
-// "License"); you may not use this file except in compliance
-// with the License.  You may obtain a copy of the License at
-//
-//   http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing,
-// software distributed under the License is distributed on an
-// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-// KIND, either express or implied.  See the License for the
-// specific language governing permissions and limitations
-// under the License.
-
 // bthread - A M:N threading library to make applications more concurrent.
+// Copyright (c) 2016 Baidu, Inc.
+// 
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+// 
+//     http://www.apache.org/licenses/LICENSE-2.0
+// 
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
+// Author: Zhangyi Chen (chenzhangyi01@baidu.com)
 // Date: 2016/04/16 18:43:24
 
 #include "bthread/execution_queue.h"
@@ -72,7 +69,7 @@ void ExecutionQueueBase::start_execute(TaskNode* node) {
     if (node->high_priority) {
         // Add _high_priority_tasks before pushing this task into queue to
         // make sure that _execute_tasks sees the newest number when this 
-        // task is in the queue. Although there might be some useless for 
+        // task is in the queue. Althouth there might be some useless for 
         // loops in _execute_tasks if this thread is scheduled out at this 
         // point, we think it's just fine.
         _high_priority_tasks.fetch_add(1, butil::memory_order_relaxed);
@@ -104,22 +101,15 @@ void ExecutionQueueBase::start_execute(TaskNode* node) {
         }
     }
 
-    if (nullptr == _options.executor) {
-        bthread_t tid;
-        // We start the execution thread in background instead of foreground as
-        // we can't determine whether the code after execute() is urgent (like
-        // unlock a pthread_mutex_t) in which case implicit context switch may
-        // cause undefined behavior (e.g. deadlock)
-        if (bthread_start_background(&tid, &_options.bthread_attr,
-                                     _execute_tasks, node) != 0) {
-            PLOG(FATAL) << "Fail to start bthread";
-            _execute_tasks(node);
-        }
-    } else {
-        if (_options.executor->submit(_execute_tasks, node) != 0) {
-            PLOG(FATAL) << "Fail to submit task";
-            _execute_tasks(node);
-        }
+    bthread_t tid;
+    // We start the execution thread in background instead of foreground as
+    // we can't determine whether the code after execute() is urgent (like
+    // unlock a pthread_mutex_t) in which case implicit context switch may
+    // cause undefined behavior (e.g. deadlock)
+    if (bthread_start_background(&tid, &_options.bthread_attr, 
+                _execute_tasks, node) != 0) {
+        PLOG(FATAL) << "Fail to start bthread";
+        _execute_tasks(node);
     }
 }
 
@@ -321,7 +311,7 @@ ExecutionQueueBase::scoped_ptr_t ExecutionQueueBase::address(uint64_t id) {
                         // We don't return m immediatly when the reference count
                         // reaches 0 as there might be in processing tasks. Instead
                         // _on_recycle would push a `stop_task', after which
-                        // is executed m would be finally reset and returned
+                        // is excuted m would be finally reset and returned
                     }
                 } else {
                     CHECK(false) << "ref-version=" << ver1

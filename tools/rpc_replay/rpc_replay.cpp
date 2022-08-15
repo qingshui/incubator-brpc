@@ -1,20 +1,18 @@
-// Licensed to the Apache Software Foundation (ASF) under one
-// or more contributor license agreements.  See the NOTICE file
-// distributed with this work for additional information
-// regarding copyright ownership.  The ASF licenses this file
-// to you under the Apache License, Version 2.0 (the
-// "License"); you may not use this file except in compliance
-// with the License.  You may obtain a copy of the License at
-//
-//   http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing,
-// software distributed under the License is distributed on an
-// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-// KIND, either express or implied.  See the License for the
-// specific language governing permissions and limitations
-// under the License.
+// Copyright (c) 2014 Baidu, Inc.
+// 
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+// 
+//     http://www.apache.org/licenses/LICENSE-2.0
+// 
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
+// Authors: Ge,Jun (gejun@baidu.com)
 
 #include <gflags/gflags.h>
 #include <butil/logging.h>
@@ -27,11 +25,7 @@
 #include <brpc/server.h>
 #include <brpc/rpc_dump.h>
 #include <brpc/serialized_request.h>
-#include <brpc/nshead_message.h>
-#include <brpc/details/http_message.h>
 #include "info_thread.h"
-
-namespace brpc {
 
 DEFINE_string(dir, "", "The directory of dumped requests");
 DEFINE_int32(times, 1, "Repeat replaying for so many times");
@@ -45,11 +39,10 @@ DEFINE_string(load_balancer, "", "The algorithm for load balancing");
 DEFINE_int32(timeout_ms, 100, "RPC timeout in milliseconds");
 DEFINE_int32(max_retry, 3, "Maximum retry times");
 DEFINE_int32(dummy_port, 8899, "Port of dummy server(to monitor replaying)");
-DEFINE_string(http_host, "", "Host field for http protocol");
 
-bvar::LatencyRecorder g_latency_recorder("rpc_replay");
-bvar::Adder<int64_t> g_error_count("rpc_replay_error_count");
-bvar::Adder<int64_t> g_sent_count;
+brpc::bvar::LatencyRecorder g_latency_recorder("rpc_replay");
+brpc::bvar::Adder<int64_t> g_error_count("rpc_replay_error_count");
+brpc::bvar::Adder<int64_t> g_sent_count;
 
 // Include channels for all protocols that support both client and server.
 class ChannelGroup {
@@ -82,7 +75,7 @@ int ChannelGroup::Init() {
         max_protocol_size = std::max(max_protocol_size,
                                      (size_t)protocols[i].first);
     }
-    _chans.resize(max_protocol_size + 1);
+    _chans.resize(max_protocol_size);
     for (size_t i = 0; i < protocols.size(); ++i) {
         if (protocols[i].second.support_client() &&
             protocols[i].second.support_server()) {
@@ -134,9 +127,8 @@ butil::atomic<int> g_thread_offset(0);
 static void* replay_thread(void* arg) {
     ChannelGroup* chan_group = static_cast<ChannelGroup*>(arg);
     const int thread_offset = g_thread_offset.fetch_add(1, butil::memory_order_relaxed);
-    double req_rate = brpc::FLAGS_qps / (double)FLAGS_thread_num;
+    double req_rate = FLAGS_qps / (double)FLAGS_thread_num;
     brpc::SerializedRequest req;
-    brpc::NsheadMessage nshead_req;
     std::deque<int64_t> timeq;
     size_t MAX_QUEUE_SIZE = (size_t)req_rate;
     if (MAX_QUEUE_SIZE < 100) {
@@ -155,37 +147,21 @@ static void* replay_thread(void* arg) {
                 continue;
             }
             brpc::Channel* chan =
-                chan_group->channel(sample->meta.protocol_type());
+                chan_group->channel(sample->protocol_type());
             if (chan == NULL) {
                 LOG(ERROR) << "No channel on protocol="
-                           << sample->meta.protocol_type();
+                           << sample->protocol_type();
                 continue;
             }
             
             brpc::Controller* cntl = new brpc::Controller;
             req.Clear();
             
-            google::protobuf::Message* req_ptr = &req;
-            cntl->reset_sampled_request(sample_guard.release());
-            if (sample->meta.protocol_type() == brpc::PROTOCOL_HTTP) {
-                brpc::HttpMessage http_message;
-                http_message.ParseFromIOBuf(sample->request);
-                cntl->http_request().Swap(http_message.header());
-                if (!FLAGS_http_host.empty()) {
-                    // reset Host in header
-                    cntl->http_request().SetHeader("Host", FLAGS_http_host);
-                }
-                cntl->request_attachment() = http_message.body().movable();
-                req_ptr = NULL;
-            } else if (sample->meta.protocol_type() == brpc::PROTOCOL_NSHEAD) {
-                nshead_req.Clear();
-                memcpy(&nshead_req.head, sample->meta.nshead().c_str(), sample->meta.nshead().length());
-                nshead_req.body = sample->request;
-                req_ptr = &nshead_req;
-            } else if (sample->meta.attachment_size() > 0) {
+            cntl->reset_rpc_dump_meta(sample_guard.release());
+            if (sample->attachment_size() > 0) {
                 sample->request.cutn(
                     &req.serialized_data(),
-                    sample->request.size() - sample->meta.attachment_size());
+                    sample->request.size() - sample->attachment_size());
                 cntl->request_attachment() = sample->request.movable();
             } else {
                 req.serialized_data() = sample->request.movable();
@@ -194,13 +170,13 @@ static void* replay_thread(void* arg) {
             const int64_t start_time = butil::gettimeofday_us();
             if (FLAGS_qps <= 0) {
                 chan->CallMethod(NULL/*use rpc_dump_context in cntl instead*/,
-                        cntl, req_ptr, NULL/*ignore response*/, NULL);
+                        cntl, &req, NULL/*ignore response*/, NULL);
                 handle_response(cntl, start_time, true);
             } else {
                 google::protobuf::Closure* done =
                     brpc::NewCallback(handle_response, cntl, start_time, false);
                 chan->CallMethod(NULL/*use rpc_dump_context in cntl instead*/,
-                        cntl, req_ptr, NULL/*ignore response*/, done);
+                        cntl, &req, NULL/*ignore response*/, done);
                 const int64_t end_time = butil::gettimeofday_us();
                 int64_t expected_elp = 0;
                 int64_t actual_elp = 0;
@@ -221,19 +197,18 @@ static void* replay_thread(void* arg) {
     }
     return NULL;
 }
-};
 
 int main(int argc, char* argv[]) {
     // Parse gflags. We recommend you to use gflags as well.
     GFLAGS_NS::ParseCommandLineFlags(&argc, &argv, true);
 
-    if (brpc::FLAGS_dir.empty() ||
-        !butil::DirectoryExists(butil::FilePath(brpc::FLAGS_dir))) {
+    if (FLAGS_dir.empty() ||
+        !butil::DirectoryExists(butil::FilePath(FLAGS_dir))) {
         LOG(ERROR) << "--dir=<dir-of-dumped-files> is required";
         return -1;
     }
 
-    if (brpc::FLAGS_dummy_port >= 0) {
+    if (FLAGS_dummy_port >= 0) {
         brpc::StartDummyServerAt(FLAGS_dummy_port);
     }
     
@@ -243,33 +218,33 @@ int main(int argc, char* argv[]) {
         return -1;
     }
 
-    if (brpc::FLAGS_thread_num <= 0) {
-        if (brpc::FLAGS_qps <= 0) { // unlimited qps
-            brpc::FLAGS_thread_num = 50;
+    if (FLAGS_thread_num <= 0) {
+        if (FLAGS_qps <= 0) { // unlimited qps
+            FLAGS_thread_num = 50;
         } else {
-            brpc::FLAGS_thread_num = brpc::FLAGS_qps / 10000;
-            if (brpc::FLAGS_thread_num < 1) {
-                brpc::FLAGS_thread_num = 1;
+            FLAGS_thread_num = FLAGS_qps / 10000;
+            if (FLAGS_thread_num < 1) {
+                FLAGS_thread_num = 1;
             }
-            if (brpc::FLAGS_thread_num > 50) {
-                brpc::FLAGS_thread_num = 50;
+            if (FLAGS_thread_num > 50) {
+                FLAGS_thread_num = 50;
             }
         }
     }
 
     std::vector<bthread_t> bids;
     std::vector<pthread_t> pids;
-    if (!brpc::FLAGS_use_bthread) {
-        pids.resize(brpc::FLAGS_thread_num);
-        for (int i = 0; i < brpc::FLAGS_thread_num; ++i) {
+    if (!FLAGS_use_bthread) {
+        pids.resize(FLAGS_thread_num);
+        for (int i = 0; i < FLAGS_thread_num; ++i) {
             if (pthread_create(&pids[i], NULL, replay_thread, &chan_group) != 0) {
                 LOG(ERROR) << "Fail to create pthread";
                 return -1;
             }
         }
     } else {
-        bids.resize(brpc::FLAGS_thread_num);
-        for (int i = 0; i < brpc::FLAGS_thread_num; ++i) {
+        bids.resize(FLAGS_thread_num);
+        for (int i = 0; i < FLAGS_thread_num; ++i) {
             if (bthread_start_background(
                     &bids[i], NULL, replay_thread, &chan_group) != 0) {
                 LOG(ERROR) << "Fail to create bthread";
@@ -288,8 +263,8 @@ int main(int argc, char* argv[]) {
         return -1;
     }
 
-    for (int i = 0; i < brpc::FLAGS_thread_num; ++i) {
-        if (!brpc::FLAGS_use_bthread) {
+    for (int i = 0; i < FLAGS_thread_num; ++i) {
+        if (!FLAGS_use_bthread) {
             pthread_join(pids[i], NULL);
         } else {
             bthread_join(bids[i], NULL);

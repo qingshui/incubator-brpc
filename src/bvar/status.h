@@ -1,20 +1,18 @@
-// Licensed to the Apache Software Foundation (ASF) under one
-// or more contributor license agreements.  See the NOTICE file
-// distributed with this work for additional information
-// regarding copyright ownership.  The ASF licenses this file
-// to you under the Apache License, Version 2.0 (the
-// "License"); you may not use this file except in compliance
-// with the License.  You may obtain a copy of the License at
-//
-//   http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing,
-// software distributed under the License is distributed on an
-// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-// KIND, either express or implied.  See the License for the
-// specific language governing permissions and limitations
-// under the License.
+// Copyright (c) 2014 Baidu, Inc.
+// 
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+// 
+//     http://www.apache.org/licenses/LICENSE-2.0
+// 
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
+// Author Zhangyi Chen (chenzhangyi01@baidu.com)
 // Date 2014/09/22 11:57:43
 
 #ifndef  BVAR_STATUS_H
@@ -27,7 +25,6 @@
 #include "butil/synchronization/lock.h"
 #include "bvar/detail/is_atomical.h"
 #include "bvar/variable.h"
-#include "bvar/reducer.h"
 namespace brpc {
 namespace bvar {
 
@@ -55,12 +52,13 @@ public:
     // Calling hide() manually is a MUST required by Variable.
     ~Status() { hide(); }
 
-    void describe(std::ostream& os, bool /*quote_string*/) const override {
+    // Implement Variable::describe() and Variable::get_value().
+    void describe(std::ostream& os, bool /*quote_string*/) const {
         os << get_value();
     }
     
 #ifdef BAIDU_INTERNAL
-    void get_value(boost::any* value) const override {
+    void get_value(boost::any* value) const {
         butil::AutoLock guard(_lock);
         *value = _value;
     }
@@ -88,48 +86,24 @@ template <typename T>
 class Status<T, typename butil::enable_if<detail::is_atomical<T>::value>::type>
     : public Variable {
 public:
-    struct PlaceHolderOp {
-        void operator()(T&, const T&) const {}
-    };
-    class SeriesSampler : public detail::Sampler {
-    public:
-        typedef typename butil::conditional<
-        true, detail::AddTo<T>, PlaceHolderOp>::type Op;
-        explicit SeriesSampler(Status* owner)
-            : _owner(owner), _series(Op()) {}
-        void take_sample() { _series.append(_owner->get_value()); }
-        void describe(std::ostream& os) { _series.describe(os, NULL); }
-    private:
-        Status* _owner;
-        detail::Series<T, Op> _series;
-    };
-
-public:
-    Status() : _series_sampler(NULL) {}
-    Status(const T& value) : _value(value), _series_sampler(NULL) { }
-    Status(const butil::StringPiece& name, const T& value)
-        : _value(value), _series_sampler(NULL) {
+    Status() {}
+    Status(const T& value) : _value(value) { }
+    Status(const butil::StringPiece& name, const T& value) : _value(value) {
         this->expose(name);
     }
     Status(const butil::StringPiece& prefix,
-           const butil::StringPiece& name, const T& value)
-        : _value(value), _series_sampler(NULL) {
+           const butil::StringPiece& name, const T& value) : _value(value) {
         this->expose_as(prefix, name);
     }
-    ~Status() {
-        hide();
-        if (_series_sampler) {
-            _series_sampler->destroy();
-            _series_sampler = NULL;
-        }
-    }
+    ~Status() { hide(); }
 
-    void describe(std::ostream& os, bool /*quote_string*/) const override {
+    // Implement Variable::describe() and Variable::get_value().
+    void describe(std::ostream& os, bool /*quote_string*/) const {
         os << get_value();
     }
     
 #ifdef BAIDU_INTERNAL
-    void get_value(boost::any* value) const override {
+    void get_value(boost::any* value) const {
         *value = get_value();
     }
 #endif
@@ -142,33 +116,8 @@ public:
         _value.store(value, butil::memory_order_relaxed);
     }
 
-    int describe_series(std::ostream& os, const SeriesOptions& options) const override {
-        if (_series_sampler == NULL) {
-            return 1;
-        }
-        if (!options.test_only) {
-            _series_sampler->describe(os);
-        }
-        return 0;
-    }
-
-protected:
-    int expose_impl(const butil::StringPiece& prefix,
-                    const butil::StringPiece& name,
-                    DisplayFilter display_filter) override {
-        const int rc = Variable::expose_impl(prefix, name, display_filter);
-        if (rc == 0 &&
-            _series_sampler == NULL &&
-            FLAGS_save_series) {
-            _series_sampler = new SeriesSampler(this);
-            _series_sampler->schedule();
-        }
-        return rc;
-    }
-
 private:
     butil::atomic<T> _value;
-    SeriesSampler* _series_sampler;
 };
 
 // Specialize for std::string, adding a printf-style set_value().
@@ -198,7 +147,7 @@ public:
 
     ~Status() { hide(); }
 
-    void describe(std::ostream& os, bool quote_string) const override {
+    void describe(std::ostream& os, bool quote_string) const {
         if (quote_string) {
             os << '"' << get_value() << '"';
         } else {
@@ -212,7 +161,7 @@ public:
     }
 
 #ifdef BAIDU_INTERNAL
-    void get_value(boost::any* value) const override {
+    void get_value(boost::any* value) const {
         *value = get_value();
     }
 #endif
@@ -239,4 +188,5 @@ private:
 
 }  // namespace bvar
 }
+
 #endif  //BVAR_STATUS_H

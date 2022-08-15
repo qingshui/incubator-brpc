@@ -1,22 +1,19 @@
-// Licensed to the Apache Software Foundation (ASF) under one
-// or more contributor license agreements.  See the NOTICE file
-// distributed with this work for additional information
-// regarding copyright ownership.  The ASF licenses this file
-// to you under the Apache License, Version 2.0 (the
-// "License"); you may not use this file except in compliance
-// with the License.  You may obtain a copy of the License at
-//
-//   http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing,
-// software distributed under the License is distributed on an
-// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-// KIND, either express or implied.  See the License for the
-// specific language governing permissions and limitations
-// under the License.
-
 // bthread - A M:N threading library to make applications more concurrent.
+// Copyright (c) 2014 Baidu, Inc.
+// 
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+// 
+//     http://www.apache.org/licenses/LICENSE-2.0
+// 
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
+// Author: Ge,Jun (gejun@baidu.com)
 // Date: Tue Jul 22 17:30:12 CST 2014
 
 #include "butil/atomicops.h"                // butil::atomic
@@ -60,7 +57,7 @@ namespace bthread {
 
 #ifdef SHOW_BTHREAD_BUTEX_WAITER_COUNT_IN_VARS
 struct ButexWaiterCount : public brpc::bvar::Adder<int64_t> {
-    ButexWaiterCount() : bvar::Adder<int64_t>("bthread_butex_waiter_count") {}
+    ButexWaiterCount() : brpc::bvar::Adder<int64_t>("bthread_butex_waiter_count") {}
 };
 inline brpc::bvar::Adder<int64_t>& butex_waiter_count() {
     return *butil::get_leaky_singleton<ButexWaiterCount>();
@@ -166,7 +163,6 @@ int wait_pthread(ButexPthreadWaiter& pw, timespec* ptimeout) {
 }
 
 extern BAIDU_THREAD_LOCAL TaskGroup* tls_task_group;
-extern BAIDU_THREAD_LOCAL TaskGroup* tls_task_group_nosignal;
 
 // Returns 0 when no need to unschedule or successfully unscheduled,
 // -1 otherwise.
@@ -257,29 +253,12 @@ void butex_destroy(void* butex) {
     butil::return_object(b);
 }
 
-inline TaskGroup* get_task_group(TaskControl* c, bool nosignal = false) {
-    TaskGroup* g;
-    if (nosignal) {
-        g = tls_task_group_nosignal;
-        if (NULL == g) {
-            g = c->choose_one_group();
-            tls_task_group_nosignal = g;
-        }
-    } else {
-        g = tls_task_group ? tls_task_group : c->choose_one_group();
-    }
-    return g;
+inline TaskGroup* get_task_group(TaskControl* c) {
+    TaskGroup* g = tls_task_group;
+    return g ? g : c->choose_one_group();
 }
 
-inline void run_in_local_task_group(TaskGroup* g, bthread_t tid, bool nosignal) {
-    if (!nosignal) {
-        TaskGroup::exchange(&g, tid);
-    } else {
-        g->ready_to_run(tid, nosignal);
-    }
-}
-
-int butex_wake(void* arg, bool nosignal) {
+int butex_wake(void* arg) {
     Butex* b = container_of(static_cast<butil::atomic<int>*>(arg), Butex, value);
     ButexWaiter* front = NULL;
     {
@@ -297,16 +276,16 @@ int butex_wake(void* arg, bool nosignal) {
     }
     ButexBthreadWaiter* bbw = static_cast<ButexBthreadWaiter*>(front);
     unsleep_if_necessary(bbw, get_global_timer_thread());
-    TaskGroup* g = get_task_group(bbw->control, nosignal);
-    if (g == tls_task_group) {
-        run_in_local_task_group(g, bbw->tid, nosignal);
+    TaskGroup* g = tls_task_group;
+    if (g) {
+        TaskGroup::exchange(&g, bbw->tid);
     } else {
-        g->ready_to_run_remote(bbw->tid, nosignal);
+        bbw->control->choose_one_group()->ready_to_run_remote(bbw->tid);
     }
     return 1;
 }
 
-int butex_wake_all(void* arg, bool nosignal) {
+int butex_wake_all(void* arg) {
     Butex* b = container_of(static_cast<butil::atomic<int>*>(arg), Butex, value);
 
     ButexWaiterList bthread_waiters;
@@ -342,7 +321,7 @@ int butex_wake_all(void* arg, bool nosignal) {
     next->RemoveFromList();
     unsleep_if_necessary(next, get_global_timer_thread());
     ++nwakeup;
-    TaskGroup* g = get_task_group(next->control, nosignal);
+    TaskGroup* g = get_task_group(next->control);
     const int saved_nwakeup = nwakeup;
     while (!bthread_waiters.empty()) {
         // pop reversely
@@ -353,13 +332,13 @@ int butex_wake_all(void* arg, bool nosignal) {
         g->ready_to_run_general(w->tid, true);
         ++nwakeup;
     }
-    if (!nosignal && saved_nwakeup != nwakeup) {
+    if (saved_nwakeup != nwakeup) {
         g->flush_nosignal_tasks_general();
     }
     if (g == tls_task_group) {
-        run_in_local_task_group(g, next->tid, nosignal);
+        TaskGroup::exchange(&g, next->tid);
     } else {
-        g->ready_to_run_remote(next->tid, nosignal);
+        g->ready_to_run_remote(next->tid);
     }
     return nwakeup;
 }
@@ -600,7 +579,7 @@ static int butex_wait_from_pthread(TaskGroup* g, Butex* b, int expected_value,
         b->waiter_lock.unlock();
 
 #ifdef SHOW_BTHREAD_BUTEX_WAITER_COUNT_IN_VARS
-        brpc::bvar::Adder<int64_t>& num_waiters = butex_waiter_count();
+        bvar::Adder<int64_t>& num_waiters = butex_waiter_count();
         num_waiters << 1;
 #endif
         rc = wait_pthread(pw, ptimeout);
@@ -666,7 +645,7 @@ int butex_wait(void* arg, int expected_value, const timespec* abstime) {
         }
     }
 #ifdef SHOW_BTHREAD_BUTEX_WAITER_COUNT_IN_VARS
-    brpc::bvar::Adder<int64_t>& num_waiters = butex_waiter_count();
+    bvar::Adder<int64_t>& num_waiters = butex_waiter_count();
     num_waiters << 1;
 #endif
 

@@ -1,19 +1,16 @@
-// Licensed to the Apache Software Foundation (ASF) under one
-// or more contributor license agreements.  See the NOTICE file
-// distributed with this work for additional information
-// regarding copyright ownership.  The ASF licenses this file
-// to you under the Apache License, Version 2.0 (the
-// "License"); you may not use this file except in compliance
-// with the License.  You may obtain a copy of the License at
-//
-//   http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing,
-// software distributed under the License is distributed on an
-// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-// KIND, either express or implied.  See the License for the
-// specific language governing permissions and limitations
-// under the License.
+// Copyright (c) 2014 Baidu, Inc.
+// 
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+// 
+//     http://www.apache.org/licenses/LICENSE-2.0
+// 
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 #include <time.h>                           // strftime
 #include <pthread.h>
@@ -220,7 +217,7 @@ void PProfService::heap(
             extra_desc = " (no TCMALLOC_SAMPLE_PARAMETER in env)";
         }
         cntl->SetFailed(ENOMETHOD, "Heap profiler is not enabled%s,"
-                        "check out https://github.com/apache/incubator-brpc/blob/master/docs/cn/heap_profiler.md",
+                        "check out http://wiki.baidu.com/display/RPC",
                         extra_desc);
         return;
     }
@@ -403,7 +400,7 @@ static void LoadSymbols() {
     size_t line_len = 0;
     ssize_t nr = 0;
     while ((nr = getline(&line, &line_len, fp.get())) != -1) {
-        butil::StringSplitter sp(line, line + nr, ' ');
+        butil::StringSplitter sp(line, line + line_len, ' ');
         if (sp == NULL) {
             continue;
         }

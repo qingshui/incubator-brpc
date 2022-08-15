@@ -1,19 +1,16 @@
-// Licensed to the Apache Software Foundation (ASF) under one
-// or more contributor license agreements.  See the NOTICE file
-// distributed with this work for additional information
-// regarding copyright ownership.  The ASF licenses this file
-// to you under the Apache License, Version 2.0 (the
-// "License"); you may not use this file except in compliance
-// with the License.  You may obtain a copy of the License at
+// Copyright (c) 2017 Baidu, Inc.
 //
-//   http://www.apache.org/licenses/LICENSE-2.0
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
-// Unless required by applicable law or agreed to in writing,
-// software distributed under the License is distributed on an
-// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-// KIND, either express or implied.  See the License for the
-// specific language governing permissions and limitations
-// under the License.
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 // A thrift client sending requests to server every 1 second.
 
@@ -32,7 +29,6 @@
  # define THRIFT_STDCXX apache::thrift::stdcxx
  #else
  # define THRIFT_STDCXX boost
- # include <boost/make_shared.hpp>
  #endif
 #endif
 
@@ -55,18 +51,15 @@ int main(int argc, char **argv) {
     transport->open();
 
     example::EchoRequest req;
-    req.__set_data("hello");
-    req.__set_need_by_proxy(10);
+    req.data = "hello";
 
     example::EchoResponse res;
 
     while (1) {
-        try {
-            client.Echo(res, req);
-            LOG(INFO) << "Req=" << req << " Res=" << res;
-        } catch (std::exception& e) {
-            LOG(ERROR) << "Fail to rpc, " << e.what();
-        }
+        client.Echo(res, req);
+
+        LOG(INFO) << "Req: " << req.data
+                  << " Res: " << res.data;
         sleep(1);
     }
     transport->close();

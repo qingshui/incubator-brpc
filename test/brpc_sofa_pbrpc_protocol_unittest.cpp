@@ -1,21 +1,5 @@
-// Licensed to the Apache Software Foundation (ASF) under one
-// or more contributor license agreements.  See the NOTICE file
-// distributed with this work for additional information
-// regarding copyright ownership.  The ASF licenses this file
-// to you under the Apache License, Version 2.0 (the
-// "License"); you may not use this file except in compliance
-// with the License.  You may obtain a copy of the License at
-//
-//   http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing,
-// software distributed under the License is distributed on an
-// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-// KIND, either express or implied.  See the License for the
-// specific language governing permissions and limitations
-// under the License.
-
 // brpc - A framework to host and access services throughout Baidu.
+// Copyright (c) 2014 Baidu, Inc.
 
 // Date: Sun Jul 13 15:04:18 CST 2014
 
@@ -222,7 +206,7 @@ TEST_F(SofaTest, process_request_failed_socket) {
     brpc::policy::MostCommonMessage* msg = MakeRequestMessage(meta);
     _socket->SetFailed();
     ProcessMessage(brpc::policy::ProcessSofaRequest, msg, false);
-    ASSERT_EQ(0ll, _server._nerror_bvar.get_value());
+    ASSERT_EQ(0ll, _server._nerror.get_value());
     CheckResponseCode(true, 0);
 }
 
@@ -234,7 +218,7 @@ TEST_F(SofaTest, process_request_logoff) {
     brpc::policy::MostCommonMessage* msg = MakeRequestMessage(meta);
     _server._status = brpc::Server::READY;
     ProcessMessage(brpc::policy::ProcessSofaRequest, msg, false);
-    ASSERT_EQ(1ll, _server._nerror_bvar.get_value());
+    ASSERT_EQ(1ll, _server._nerror.get_value());
     CheckResponseCode(false, brpc::ELOGOFF);
 }
 
@@ -245,7 +229,7 @@ TEST_F(SofaTest, process_request_wrong_method) {
     meta.set_method("EchoService.NO_SUCH_METHOD");
     brpc::policy::MostCommonMessage* msg = MakeRequestMessage(meta);
     ProcessMessage(brpc::policy::ProcessSofaRequest, msg, false);
-    ASSERT_EQ(1ll, _server._nerror_bvar.get_value());
+    ASSERT_EQ(1ll, _server._nerror.get_value());
     CheckResponseCode(false, brpc::ENOMETHOD);
 }
 

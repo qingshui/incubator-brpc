@@ -1,19 +1,19 @@
-// Licensed to the Apache Software Foundation (ASF) under one
-// or more contributor license agreements.  See the NOTICE file
-// distributed with this work for additional information
-// regarding copyright ownership.  The ASF licenses this file
-// to you under the Apache License, Version 2.0 (the
-// "License"); you may not use this file except in compliance
-// with the License.  You may obtain a copy of the License at
-//
-//   http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing,
-// software distributed under the License is distributed on an
-// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-// KIND, either express or implied.  See the License for the
-// specific language governing permissions and limitations
-// under the License.
+// Copyright (c) 2014 Baidu, Inc.
+// 
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+// 
+//     http://www.apache.org/licenses/LICENSE-2.0
+// 
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+// Authors: Rujie Jiang(jiangrujie@baidu.com)
+//          Ge,Jun(gejun@baidu.com)
 
 #ifndef BRPC_ACCEPTOR_H
 #define BRPC_ACCEPTOR_H
@@ -25,6 +25,9 @@
 
 
 namespace brpc {
+namespace rdma {
+class RdmaCommunicationManager;
+}
 
 struct ConnectStatistics {
 };
@@ -46,15 +49,20 @@ public:
     explicit Acceptor(bthread_keytable_pool_t* pool = NULL);
     ~Acceptor();
 
-    // [thread-safe] Accept connections from `listened_fd'. Ownership of
-    // `listened_fd' is also transferred to `Acceptor'. Can be called
-    // multiple times if the last `StartAccept' has been completely stopped
-    // by calling `StopAccept' and `Join'. Connections that has no data
-    // transmission for `idle_timeout_sec' will be closed automatically iff
-    // `idle_timeout_sec' > 0
+    // [thread-safe] Accept connections from `listened_fd' and `listened_rdma'.
+    // Ownership of `listened_fd' and `listened_rdma' is also transferred to
+    // `Acceptor'. Can be called multiple times if the last `StartAccept' has
+    // been completely stopped by calling `StopAccept' and `Join'. Connections
+    // that has no data transmission for `idle_timeout_sec' will be closed
+    // automatically iff `idle_timeout_sec' > 0
     // Return 0 on success, -1 otherwise.
-    int StartAccept(int listened_fd, int idle_timeout_sec,
-                    const std::shared_ptr<SocketSSLContext>& ssl_ctx);
+    int StartAccept(int listened_fd,
+                    rdma::RdmaCommunicationManager* listened_rdma,
+                    int idle_timeout_sec, SSL_CTX* ssl_ctx);
+    // Just accept at TCP fd
+    int StartAccept(int listened_fd, int idle_timeout_sec, SSL_CTX* ssl_ctx) {
+        return StartAccept(listened_fd, NULL, idle_timeout_sec, ssl_ctx);
+    }
 
     // [thread-safe] Stop accepting connections.
     // `closewait_ms' is not used anymore.
@@ -81,6 +89,9 @@ private:
     // Accept connections.
     static void OnNewConnectionsUntilEAGAIN(Socket* m);
     static void OnNewConnections(Socket* m);
+    // Accept RDMA connections.
+    static void OnNewRdmaConnectionsUntilEAGAIN(Socket* m);
+    static void OnNewRdmaConnections(Socket* m);
 
     static void* CloseIdleConnections(void* arg);
     
@@ -88,7 +99,7 @@ private:
     int Initialize();
 
     // Remove the accepted socket `sock' from inside
-    void BeforeRecycle(Socket* sock) override;
+    virtual void BeforeRecycle(Socket* sock);
 
     bthread_keytable_pool_t* _keytable_pool; // owned by Server
     Status _status;
@@ -96,8 +107,13 @@ private:
     bthread_t _close_idle_tid;
 
     int _listened_fd;
-    // The Socket tso accept connections.
+    // The Socket to accept connections.
     SocketId _acception_id;
+
+    // The rdmacm used for listenning
+    rdma::RdmaCommunicationManager* _listened_rdma;
+    // The Socket to accept RDMA connections.
+    SocketId _rdma_acception_id;
 
     butil::Mutex _map_mutex;
     butil::ConditionVariable _empty_cond;
@@ -105,7 +121,8 @@ private:
     // The map containing all the accepted sockets
     SocketMap _socket_map;
 
-    std::shared_ptr<SocketSSLContext> _ssl_ctx;
+    // Not owner
+    SSL_CTX* _ssl_ctx;
 };
 
 } // namespace brpc

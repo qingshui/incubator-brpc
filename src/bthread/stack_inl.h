@@ -1,26 +1,27 @@
-// Licensed to the Apache Software Foundation (ASF) under one
-// or more contributor license agreements.  See the NOTICE file
-// distributed with this work for additional information
-// regarding copyright ownership.  The ASF licenses this file
-// to you under the Apache License, Version 2.0 (the
-// "License"); you may not use this file except in compliance
-// with the License.  You may obtain a copy of the License at
-//
-//   http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing,
-// software distributed under the License is distributed on an
-// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-// KIND, either express or implied.  See the License for the
-// specific language governing permissions and limitations
-// under the License.
-
 // bthread - A M:N threading library to make applications more concurrent.
+// Copyright (c) 2014 Baidu, Inc.
+// 
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+// 
+//     http://www.apache.org/licenses/LICENSE-2.0
+// 
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
+// Author: Ge,Jun (gejun@baidu.com)
 // Date: Sun Sep  7 22:37:39 CST 2014
 
 #ifndef BTHREAD_ALLOCATE_STACK_INL_H
 #define BTHREAD_ALLOCATE_STACK_INL_H
+
+DECLARE_int32(guard_page_size);
+DECLARE_int32(tc_stack_small);
+DECLARE_int32(tc_stack_normal);
 
 namespace bthread {
 
@@ -46,7 +47,7 @@ template <typename StackClass> struct StackFactory {
     struct Wrapper : public ContextualStack {
         explicit Wrapper(void (*entry)(intptr_t)) {
             if (allocate_stack_storage(&storage, *StackClass::stack_size_flag,
-                bthread::FLAGS_guard_page_size) != 0) {
+                                       FLAGS_guard_page_size) != 0) {
                 storage.zeroize();
                 context = NULL;
                 return;
@@ -149,14 +150,14 @@ template <> struct ObjectPoolBlockMaxItem<
 template <> struct ObjectPoolFreeChunkMaxItem<
     bthread::StackFactory<bthread::SmallStackClass>::Wrapper> {
     inline static size_t value() {
-        return (bthread::FLAGS_tc_stack_small <= 0 ? 0 : bthread::FLAGS_tc_stack_small);
+        return (FLAGS_tc_stack_small <= 0 ? 0 : FLAGS_tc_stack_small);
     }
 };
 
 template <> struct ObjectPoolFreeChunkMaxItem<
     bthread::StackFactory<bthread::NormalStackClass>::Wrapper> {
     inline static size_t value() {
-        return (bthread::FLAGS_tc_stack_normal <= 0 ? 0 : bthread::FLAGS_tc_stack_normal);
+        return (FLAGS_tc_stack_normal <= 0 ? 0 : FLAGS_tc_stack_normal);
     }
 };
 

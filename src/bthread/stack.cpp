@@ -1,22 +1,19 @@
-// Licensed to the Apache Software Foundation (ASF) under one
-// or more contributor license agreements.  See the NOTICE file
-// distributed with this work for additional information
-// regarding copyright ownership.  The ASF licenses this file
-// to you under the Apache License, Version 2.0 (the
-// "License"); you may not use this file except in compliance
-// with the License.  You may obtain a copy of the License at
-//
-//   http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing,
-// software distributed under the License is distributed on an
-// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-// KIND, either express or implied.  See the License for the
-// specific language governing permissions and limitations
-// under the License.
-
 // bthread - A M:N threading library to make applications more concurrent.
+// Copyright (c) 2014 Baidu, Inc.
+// 
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+// 
+//     http://www.apache.org/licenses/LICENSE-2.0
+// 
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
+// Author: Ge,Jun (gejun@baidu.com)
 // Date: Sun Sep  7 22:37:39 CST 2014
 
 #include <unistd.h>                               // getpagesize
@@ -31,14 +28,14 @@
 #include "bthread/types.h"                        // BTHREAD_STACKTYPE_*
 #include "bthread/stack.h"
 
-namespace bthread {
-
 DEFINE_int32(stack_size_small, 32768, "size of small stacks");
 DEFINE_int32(stack_size_normal, 1048576, "size of normal stacks");
 DEFINE_int32(stack_size_large, 8388608, "size of large stacks");
 DEFINE_int32(guard_page_size, 4096, "size of guard page, allocate stacks by malloc if it's 0(not recommended)");
 DEFINE_int32(tc_stack_small, 32, "maximum small stacks cached by each thread");
 DEFINE_int32(tc_stack_normal, 8, "maximum normal stacks cached by each thread");
+
+namespace bthread {
 
 BAIDU_CASSERT(BTHREAD_STACKTYPE_PTHREAD == STACK_TYPE_PTHREAD, must_match);
 BAIDU_CASSERT(BTHREAD_STACKTYPE_SMALL == STACK_TYPE_SMALL, must_match);
@@ -135,7 +132,7 @@ void deallocate_stack_storage(StackStorage* s) {
         VALGRIND_STACK_DEREGISTER(s->valgrind_stack_id);
     }
     const int memsize = s->stacksize + s->guardsize;
-    if ((uintptr_t)s->bottom <= (uintptr_t)memsize) {
+    if ((char*)s->bottom <= (char*)NULL + memsize) {
         return;
     }
     s_stack_count.fetch_sub(1, butil::memory_order_relaxed);
@@ -146,8 +143,8 @@ void deallocate_stack_storage(StackStorage* s) {
     }
 }
 
-int* SmallStackClass::stack_size_flag = &bthread::FLAGS_stack_size_small;
-int* NormalStackClass::stack_size_flag = &bthread::FLAGS_stack_size_normal;
-int* LargeStackClass::stack_size_flag = &bthread::FLAGS_stack_size_large;
+int* SmallStackClass::stack_size_flag = &FLAGS_stack_size_small;
+int* NormalStackClass::stack_size_flag = &FLAGS_stack_size_normal;
+int* LargeStackClass::stack_size_flag = &FLAGS_stack_size_large;
 
 }  // namespace bthread

@@ -71,9 +71,6 @@ class BUTIL_EXPORT TimeDelta {
   TimeDelta() : delta_(0) {
   }
 
-  // Required by clang++ 11 on MacOS catalina
-  TimeDelta(const TimeDelta& other) : delta_(other.delta_) {}
-
   // Converts units of time to TimeDeltas.
   static TimeDelta FromDays(int days);
   static TimeDelta FromHours(int hours);
@@ -271,9 +268,6 @@ class BUTIL_EXPORT Time {
   // Contains the NULL time. Use Time::Now() to get the current time.
   Time() : us_(0) {
   }
-
-  // Required by clang++ 11 on MacOS catalina
-  Time(const Time& other) : us_(other.us_) {}
 
   // Returns true if the time object has not been initialized.
   bool is_null() const {
@@ -613,9 +607,6 @@ class BUTIL_EXPORT TimeTicks {
 
   TimeTicks() : ticks_(0) {
   }
-
-  // Required by clang++ 11 on MacOS catalina
-  TimeTicks(const TimeTicks& other) : ticks_(other.ticks_) {}
 
   // Platform-dependent tick count representing "right now."
   // The resolution of this clock is ~1-15ms.  Resolution varies depending

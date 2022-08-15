@@ -39,7 +39,7 @@
 
 ```c++
 // Thread 1
-// bool ready was initialized to false
+// ready was initialized to false
 p.init();
 ready = true;
 ```
@@ -72,7 +72,7 @@ if (ready) {
 
 ```c++
 // Thread1
-// std::atomic<bool> ready was initialized to false
+// ready was initialized to false
 p.init();
 ready.store(true, std::memory_order_release);
 ```

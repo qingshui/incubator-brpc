@@ -35,26 +35,25 @@ void SplitStringT(const STR& str,
   }
 }
 
-template <typename STR>
-bool SplitStringIntoKeyValueT(const STR& line,
-                             typename STR::value_type key_value_delimiter,
-                             STR* key,
-                             STR* value) {
+bool SplitStringIntoKeyValue(const std::string& line,
+                             char key_value_delimiter,
+                             std::string* key,
+                             std::string* value) {
   key->clear();
   value->clear();
 
   // Find the delimiter.
   size_t end_key_pos = line.find_first_of(key_value_delimiter);
-  if (end_key_pos == STR::npos) {
+  if (end_key_pos == std::string::npos) {
     DVLOG(1) << "cannot find delimiter in: " << line;
     return false;    // no delimiter
   }
   key->assign(line, 0, end_key_pos);
 
   // Find the value string.
-  STR remains(line, end_key_pos, line.size() - end_key_pos);
+  std::string remains(line, end_key_pos, line.size() - end_key_pos);
   size_t begin_value_pos = remains.find_first_not_of(key_value_delimiter);
-  if (begin_value_pos == STR::npos) {
+  if (begin_value_pos == std::string::npos) {
     DVLOG(1) << "cannot parse value from line: " << line;
     return false;   // no value
   }
@@ -135,13 +134,6 @@ void SplitString(const string16& str,
   SplitStringT(str, c, true, r);
 }
 
-void SplitString(const butil::StringPiece16& str,
-                 char16 c,
-                 std::vector<butil::StringPiece16>* r) {
-  DCHECK(CBU16_IS_SINGLE(c));
-  SplitStringT(str, c, true, r);
-}
-
 void SplitString(const std::string& str,
                  char c,
                  std::vector<std::string>* r) {
@@ -152,24 +144,13 @@ void SplitString(const std::string& str,
   SplitStringT(str, c, true, r);
 }
 
-void SplitString(const StringPiece& str,
-                 char c,
-                 std::vector<StringPiece>* r) {
-#if CHAR_MIN < 0
-  DCHECK(c >= 0);
-#endif
-  DCHECK(c < 0x7F);
-  SplitStringT(str, c, true, r);
-}
-
-template<typename STR>
-bool SplitStringIntoKeyValuePairsT(const STR& line,
+bool SplitStringIntoKeyValuePairs(const std::string& line,
                                   char key_value_delimiter,
                                   char key_value_pair_delimiter,
-                                  std::vector<std::pair<STR, STR> >* key_value_pairs) {
+                                  StringPairs* key_value_pairs) {
   key_value_pairs->clear();
 
-  std::vector<STR> pairs;
+  std::vector<std::string> pairs;
   SplitString(line, key_value_pair_delimiter, &pairs);
 
   bool success = true;
@@ -178,43 +159,21 @@ bool SplitStringIntoKeyValuePairsT(const STR& line,
     if (pairs[i].empty())
       continue;
 
-    STR key;
-    STR value;
-    if (!SplitStringIntoKeyValueT(pairs[i], key_value_delimiter, &key, &value)) {
+    std::string key;
+    std::string value;
+    if (!SplitStringIntoKeyValue(pairs[i], key_value_delimiter, &key, &value)) {
       // Don't return here, to allow for pairs without associated
       // value or key; just record that the split failed.
       success = false;
     }
-    key_value_pairs->emplace_back(key, value);
+    key_value_pairs->push_back(make_pair(key, value));
   }
   return success;
-}
-
-bool SplitStringIntoKeyValuePairs(const std::string& line,
-                                  char key_value_delimiter,
-                                  char key_value_pair_delimiter,
-                                  StringPairs* key_value_pairs) {
-  return SplitStringIntoKeyValuePairsT(line, key_value_delimiter,
-                                       key_value_pair_delimiter, key_value_pairs);
-}
-
-bool SplitStringIntoKeyValuePairs(const butil::StringPiece& line,
-                                  char key_value_delimiter,
-                                  char key_value_pair_delimiter,
-                                  StringPiecePairs* key_value_pairs) {
-  return SplitStringIntoKeyValuePairsT(line, key_value_delimiter,
-                                       key_value_pair_delimiter, key_value_pairs);
 }
 
 void SplitStringUsingSubstr(const string16& str,
                             const string16& s,
                             std::vector<string16>* r) {
-  SplitStringUsingSubstrT(str, s, r);
-}
-
-void SplitStringUsingSubstr(const butil::StringPiece16& str,
-                            const butil::StringPiece16& s,
-                            std::vector<butil::StringPiece16>* r) {
   SplitStringUsingSubstrT(str, s, r);
 }
 
@@ -224,22 +183,9 @@ void SplitStringUsingSubstr(const std::string& str,
   SplitStringUsingSubstrT(str, s, r);
 }
 
-void SplitStringUsingSubstr(const butil::StringPiece& str,
-                            const butil::StringPiece& s,
-                            std::vector<butil::StringPiece>* r) {
-  SplitStringUsingSubstrT(str, s, r);
-}
-
 void SplitStringDontTrim(const string16& str,
                          char16 c,
                          std::vector<string16>* r) {
-  DCHECK(CBU16_IS_SINGLE(c));
-  SplitStringT(str, c, false, r);
-}
-
-void SplitStringDontTrim(const butil::StringPiece16& str,
-                         char16 c,
-                         std::vector<butil::StringPiece16>* r) {
   DCHECK(CBU16_IS_SINGLE(c));
   SplitStringT(str, c, false, r);
 }
@@ -255,34 +201,13 @@ void SplitStringDontTrim(const std::string& str,
   SplitStringT(str, c, false, r);
 }
 
-void SplitStringDontTrim(const butil::StringPiece& str,
-                         char c,
-                         std::vector<butil::StringPiece>* r) {
-  DCHECK(IsStringUTF8(str));
-#if CHAR_MIN < 0
-  DCHECK(c >= 0);
-#endif
-  DCHECK(c < 0x7F);
-  SplitStringT(str, c, false, r);
-}
-
 void SplitStringAlongWhitespace(const string16& str,
                                 std::vector<string16>* result) {
   SplitStringAlongWhitespaceT(str, result);
 }
 
-void SplitStringAlongWhitespace(const butil::StringPiece16& str,
-                                std::vector<butil::StringPiece16>* result) {
-  SplitStringAlongWhitespaceT(str, result);
-}
-
 void SplitStringAlongWhitespace(const std::string& str,
                                 std::vector<std::string>* result) {
-  SplitStringAlongWhitespaceT(str, result);
-}
-
-void SplitStringAlongWhitespace(const butil::StringPiece& str,
-                                std::vector<butil::StringPiece>* result) {
   SplitStringAlongWhitespaceT(str, result);
 }
 

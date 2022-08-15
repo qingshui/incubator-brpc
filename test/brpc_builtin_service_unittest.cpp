@@ -1,21 +1,5 @@
-// Licensed to the Apache Software Foundation (ASF) under one
-// or more contributor license agreements.  See the NOTICE file
-// distributed with this work for additional information
-// regarding copyright ownership.  The ASF licenses this file
-// to you under the Apache License, Version 2.0 (the
-// "License"); you may not use this file except in compliance
-// with the License.  You may obtain a copy of the License at
-//
-//   http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing,
-// software distributed under the License is distributed on an
-// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-// KIND, either express or implied.  See the License for the
-// specific language governing permissions and limitations
-// under the License.
-
 // brpc - A framework to host and access services throughout Baidu.
+// Copyright (c) 2014 Baidu, Inc.
 
 // Date: Sun Jul 13 15:04:18 CST 2014
 
@@ -235,7 +219,7 @@ protected:
         EXPECT_FALSE(cntl.Failed());
         EXPECT_EQ(expect_type, cntl.http_response().content_type());
         CheckContent(cntl, buf);
-        CheckFieldInContent(cntl, "channel_connection_count: ", 0);
+        CheckFieldInContent(cntl, "channel_socket_count: ", 0);
 
         close(cfd);
         StopAndJoin();
@@ -663,15 +647,15 @@ TEST_F(BuiltinServiceTest, pprof) {
         ClosureChecker done;
         brpc::Controller cntl;
         service.heap(&cntl, NULL, NULL, &done);
-        const int rc = getenv("TCMALLOC_SAMPLE_PARAMETER") != nullptr ? 0 : brpc::ENOMETHOD;
-        EXPECT_EQ(rc, cntl.ErrorCode()) << cntl.ErrorText();
+        const int rc = getenv("TCMALLOC_SAMPLE_PARAMETER") ? 0 : brpc::ENOMETHOD;
+        EXPECT_EQ(rc, cntl.ErrorCode());
     }
     {
         ClosureChecker done;
         brpc::Controller cntl;
         service.growth(&cntl, NULL, NULL, &done);
         // linked tcmalloc in UT
-        EXPECT_EQ(0, cntl.ErrorCode()) << cntl.ErrorText();
+        EXPECT_EQ(0, cntl.ErrorCode());
     }
     {
         ClosureChecker done;

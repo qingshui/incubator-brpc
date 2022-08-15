@@ -1,22 +1,19 @@
-// Licensed to the Apache Software Foundation (ASF) under one
-// or more contributor license agreements.  See the NOTICE file
-// distributed with this work for additional information
-// regarding copyright ownership.  The ASF licenses this file
-// to you under the Apache License, Version 2.0 (the
-// "License"); you may not use this file except in compliance
-// with the License.  You may obtain a copy of the License at
-//
-//   http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing,
-// software distributed under the License is distributed on an
-// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-// KIND, either express or implied.  See the License for the
-// specific language governing permissions and limitations
-// under the License.
-
 // bthread - A M:N threading library to make applications more concurrent.
+// Copyright (c) 2014 Baidu, Inc.
+// 
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+// 
+//     http://www.apache.org/licenses/LICENSE-2.0
+// 
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
+// Author: Ge,Jun (gejun@baidu.com)
 // Date: Sun Aug  3 12:46:15 CST 2014
 
 #include <pthread.h>
@@ -44,8 +41,9 @@
 #include "bthread/log.h"
 
 extern "C" {
-extern void* __attribute__((weak)) _dl_sym(void* handle, const char* symbol, void* caller);
+extern void* _dl_sym(void* handle, const char* symbol, void* caller);
 }
+
 namespace bthread {
 // Warm up backtrace before main().
 void* dummy_buf[4];
@@ -66,10 +64,10 @@ struct SampledContention : public brpc::bvar::Collected {
     int nframes;          // #elements in stack
     void* stack[26];      // backtrace.
 
-    // Implement brpc::brpc::bvar::Collected
-    void dump_and_destroy(size_t round) override;
-    void destroy() override;
-    brpc::bvar::CollectorSpeedLimit* speed_limit() override { return &g_cp_sl; }
+    // Implement brpc::bvar::Collected
+    void dump_and_destroy(size_t round);
+    void destroy();
+    brpc::bvar::CollectorSpeedLimit* speed_limit() { return &g_cp_sl; }
 
     // For combining samples with hashmap.
     size_t hash_code() const {
@@ -407,14 +405,8 @@ static void init_sys_mutex_lock() {
 #if defined(OS_LINUX)
     // TODO: may need dlvsym when GLIBC has multiple versions of a same symbol.
     // http://blog.fesnel.com/blog/2009/08/25/preloading-with-multiple-symbol-versions
-    if (_dl_sym) {
-        sys_pthread_mutex_lock = (MutexOp)_dl_sym(RTLD_NEXT, "pthread_mutex_lock", (void*)init_sys_mutex_lock);
-        sys_pthread_mutex_unlock = (MutexOp)_dl_sym(RTLD_NEXT, "pthread_mutex_unlock", (void*)init_sys_mutex_lock);
-    } else {
-        // _dl_sym may be undefined reference in some system, fallback to dlsym
-        sys_pthread_mutex_lock = (MutexOp)dlsym(RTLD_NEXT, "pthread_mutex_lock");
-        sys_pthread_mutex_unlock = (MutexOp)dlsym(RTLD_NEXT, "pthread_mutex_unlock");
-    }
+    sys_pthread_mutex_lock = (MutexOp)_dl_sym(RTLD_NEXT, "pthread_mutex_lock", (void*)init_sys_mutex_lock);
+    sys_pthread_mutex_unlock = (MutexOp)_dl_sym(RTLD_NEXT, "pthread_mutex_unlock", (void*)init_sys_mutex_lock);
 #elif defined(OS_MACOSX)
     // TODO: look workaround for dlsym on mac
     sys_pthread_mutex_lock = (MutexOp)dlsym(RTLD_NEXT, "pthread_mutex_lock");
@@ -535,7 +527,7 @@ BUTIL_FORCE_INLINE int pthread_mutex_lock_impl(pthread_mutex_t* mutex) {
     if (rc != EBUSY) {
         return rc;
     }
-    // Ask brpc::brpc::bvar::Collector if this (contended) locking should be sampled
+    // Ask brpc::bvar::Collector if this (contended) locking should be sampled
     const size_t sampling_range = brpc::bvar::is_collectable(&g_cp_sl);
 
     bthread_contention_site_t* csite = NULL;

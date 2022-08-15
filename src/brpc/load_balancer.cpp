@@ -1,20 +1,18 @@
-// Licensed to the Apache Software Foundation (ASF) under one
-// or more contributor license agreements.  See the NOTICE file
-// distributed with this work for additional information
-// regarding copyright ownership.  The ASF licenses this file
-// to you under the Apache License, Version 2.0 (the
-// "License"); you may not use this file except in compliance
-// with the License.  You may obtain a copy of the License at
-//
-//   http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing,
-// software distributed under the License is distributed on an
-// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-// KIND, either express or implied.  See the License for the
-// specific language governing permissions and limitations
-// under the License.
+// Copyright (c) 2014 Baidu, Inc.
+// 
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+// 
+//     http://www.apache.org/licenses/LICENSE-2.0
+// 
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
+// Authors: Ge,Jun (gejun@baidu.com)
 
 #include <gflags/gflags.h>
 #include "brpc/reloadable_flags.h"
@@ -24,11 +22,6 @@
 namespace brpc {
 
 DEFINE_bool(show_lb_in_vars, false, "Describe LoadBalancers in vars");
-DEFINE_int32(default_weight_of_wlb, 0, "Default weight value of Weighted LoadBalancer(wlb). "
-             "wlb policy degradation is enabled when default_weight_of_wlb > 0 to avoid some "
-             "problems when user is using wlb but forgot to set the weights of some of their "
-             "downstream instances. Then these instances will be set default_weight_of_wlb as "
-             "their weights. wlb policy degradation is not enabled by default.");
 BRPC_VALIDATE_GFLAG(show_lb_in_vars, PassValidate);
 
 // For assigning unique names for lb.
@@ -69,23 +62,18 @@ SharedLoadBalancer::~SharedLoadBalancer() {
     }
 }
 
-int SharedLoadBalancer::Init(const char* lb_protocol) {
-    std::string lb_name;
-    butil::StringPiece lb_params;
-    if (!ParseParameters(lb_protocol, &lb_name, &lb_params)) {
-        LOG(FATAL) << "Fail to parse this load balancer protocol '" << lb_protocol << '\'';
-        return -1;
-    }
-    const LoadBalancer* lb = LoadBalancerExtension()->Find(lb_name.c_str());
+int SharedLoadBalancer::Init(const char* lb_name) {
+    const LoadBalancer* lb = LoadBalancerExtension()->Find(lb_name);
     if (lb == NULL) {
         LOG(FATAL) << "Fail to find LoadBalancer by `" << lb_name << "'";
         return -1;
     }
-    _lb = lb->New(lb_params);
-    if (_lb == NULL) {
+    LoadBalancer* lb_copy = lb->New();
+    if (lb_copy == NULL) {
         LOG(FATAL) << "Fail to new LoadBalancer";
         return -1;
     }
+    _lb = lb_copy;
     if (FLAGS_show_lb_in_vars && !_exposed) {
         ExposeLB();
     }
@@ -101,26 +89,4 @@ void SharedLoadBalancer::Describe(std::ostream& os,
     }
 }
 
-bool SharedLoadBalancer::ParseParameters(const butil::StringPiece& lb_protocol,
-                                         std::string* lb_name,
-                                         butil::StringPiece* lb_params) {
-    lb_name->clear();
-    lb_params->clear();
-    if (lb_protocol.empty()) {
-        return false;
-    }
-    const char separator = ':';
-    size_t pos = lb_protocol.find(separator);
-    if (pos == std::string::npos) {
-        lb_name->append(lb_protocol.data(), lb_protocol.size());
-    } else {
-        lb_name->append(lb_protocol.data(), pos);
-        if (pos < lb_protocol.size() - sizeof(separator)) {
-            *lb_params = lb_protocol.substr(pos + sizeof(separator));
-        }
-    }
-
-    return true;
-}
-																				 
 } // namespace brpc

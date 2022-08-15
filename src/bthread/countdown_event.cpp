@@ -1,22 +1,19 @@
-// Licensed to the Apache Software Foundation (ASF) under one
-// or more contributor license agreements.  See the NOTICE file
-// distributed with this work for additional information
-// regarding copyright ownership.  The ASF licenses this file
-// to you under the Apache License, Version 2.0 (the
-// "License"); you may not use this file except in compliance
-// with the License.  You may obtain a copy of the License at
-//
-//   http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing,
-// software distributed under the License is distributed on an
-// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-// KIND, either express or implied.  See the License for the
-// specific language governing permissions and limitations
-// under the License.
-
 // bthread - A M:N threading library to make applications more concurrent.
+// Copyright (c) 2016 Baidu, Inc.
+// 
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+// 
+//     http://www.apache.org/licenses/LICENSE-2.0
+// 
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
+// Author: Zhangyi Chen (chenzhangyi01@baidu.com)
 // Date: 2016/06/03 13:15:24
 
 #include "butil/atomicops.h"     // butil::atomic<int>
@@ -39,7 +36,7 @@ CountdownEvent::~CountdownEvent() {
     butex_destroy(_butex);
 }
 
-void CountdownEvent::signal(int sig, bool flush) {
+void CountdownEvent::signal(int sig) {
     // Have to save _butex, *this is probably defreferenced by the wait thread
     // which sees fetch_sub
     void* const saved_butex = _butex;
@@ -50,7 +47,7 @@ void CountdownEvent::signal(int sig, bool flush) {
         return;
     }
     LOG_IF(ERROR, prev < sig) << "Counter is over decreased";
-    butex_wake_all(saved_butex, flush);
+    butex_wake_all(saved_butex);
 }
 
 int CountdownEvent::wait() {

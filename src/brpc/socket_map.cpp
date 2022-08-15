@@ -1,20 +1,19 @@
-// Licensed to the Apache Software Foundation (ASF) under one
-// or more contributor license agreements.  See the NOTICE file
-// distributed with this work for additional information
-// regarding copyright ownership.  The ASF licenses this file
-// to you under the Apache License, Version 2.0 (the
-// "License"); you may not use this file except in compliance
-// with the License.  You may obtain a copy of the License at
-//
-//   http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing,
-// software distributed under the License is distributed on an
-// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-// KIND, either express or implied.  See the License for the
-// specific language governing permissions and limitations
-// under the License.
+// Copyright (c) 2014 Baidu, Inc.
+// 
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+// 
+//     http://www.apache.org/licenses/LICENSE-2.0
+// 
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
+// Authors: Ge,Jun (gejun@baidu.com)
+//          Rujie Jiang (jiangrujie@baidu.com)
 
 #include <gflags/gflags.h>
 #include <map>
@@ -22,11 +21,14 @@
 #include "butil/time.h"
 #include "butil/scoped_lock.h"
 #include "butil/logging.h"
+#include "butil/third_party/murmurhash3/murmurhash3.h"
 #include "brpc/log.h"
 #include "brpc/protocol.h"
 #include "brpc/input_messenger.h"
 #include "brpc/reloadable_flags.h"
 #include "brpc/socket_map.h"
+#include "brpc/details/ssl_helper.h"        // CreateClientSSLContext
+
 
 namespace brpc {
 
@@ -86,9 +88,63 @@ SocketMap* get_or_new_client_side_socket_map() {
     return g_socket_map.load(butil::memory_order_consume);
 }
 
-int SocketMapInsert(const SocketMapKey& key, SocketId* id,
-                    const std::shared_ptr<SocketSSLContext>& ssl_ctx) {
-    return get_or_new_client_side_socket_map()->Insert(key, id, ssl_ctx);
+void ComputeSocketMapKeyChecksum(const SocketMapKey& key,
+                                 unsigned char* checksum) {
+    butil::MurmurHash3_x64_128_Context mm_ctx;
+    butil::MurmurHash3_x64_128_Init(&mm_ctx, 0);
+
+    const int BUFSIZE = 1024;        // Should be enough
+    char buf[BUFSIZE];
+    int cur_len = 0;
+
+#define SAFE_MEMCOPY(dst, cur_len, src, size)                   \
+    do {                                                        \
+        int copy_len = std::min((int)size, BUFSIZE - cur_len);  \
+        if (copy_len > 0) {                                     \
+            memcpy(dst + cur_len, src, copy_len);               \
+            cur_len += copy_len;                                \
+        }                                                       \
+    } while (0);
+
+    std::size_t ephash = butil::DefaultHasher<butil::EndPoint>()(key.peer);
+    SAFE_MEMCOPY(buf, cur_len, &ephash, sizeof(ephash));
+    SAFE_MEMCOPY(buf, cur_len, &key.auth, sizeof(key.auth));
+    SAFE_MEMCOPY(buf, cur_len, &key.use_rdma, sizeof(key.use_rdma));
+
+    const ChannelSSLOptions& ssl = key.ssl_options;
+    SAFE_MEMCOPY(buf, cur_len, &ssl.enable, sizeof(ssl.enable));
+    if (ssl.enable) {
+        SAFE_MEMCOPY(buf, cur_len, ssl.ciphers.data(), ssl.ciphers.size());
+        SAFE_MEMCOPY(buf, cur_len, ssl.protocols.data(), ssl.protocols.size());
+        SAFE_MEMCOPY(buf, cur_len, ssl.sni_name.data(), ssl.sni_name.size());
+
+        const VerifyOptions& verify = ssl.verify;
+        SAFE_MEMCOPY(buf, cur_len, &verify.verify_depth,
+                     sizeof(verify.verify_depth));
+        if (verify.verify_depth > 0) {
+            SAFE_MEMCOPY(buf, cur_len, verify.ca_file_path.data(),
+                         verify.ca_file_path.size());
+        }
+    } else {
+        // All disabled ChannelSSLOptions are the same
+    }
+#undef SAFE_MEMCOPY
+
+    butil::MurmurHash3_x64_128_Update(&mm_ctx, buf, cur_len);
+    const CertInfo& cert = ssl.client_cert;
+    if (ssl.enable && !cert.certificate.empty()) {
+        // Certificate may be too long (PEM string) to fit into `buf'
+        butil::MurmurHash3_x64_128_Update(
+            &mm_ctx, cert.certificate.data(), cert.certificate.size());
+        butil::MurmurHash3_x64_128_Update(
+            &mm_ctx, cert.private_key.data(), cert.private_key.size());
+        // sni_filters has no effect in ChannelSSLOptions
+    }
+    butil::MurmurHash3_x64_128_Final(checksum, &mm_ctx);
+}
+
+int SocketMapInsert(const SocketMapKey& key, SocketId* id) {
+    return get_or_new_client_side_socket_map()->Insert(key, id);
 }    
 
 int SocketMapFind(const SocketMapKey& key, SocketId* id) {
@@ -106,7 +162,7 @@ void SocketMapRemove(const SocketMapKey& key) {
         // at NamingServiceThread is hard to be fixed right now. As long as
         // FLAGS_health_check_interval is limited to positive, SocketMapInsert
         // never replaces the sockets, skipping comparison is still right.
-        m->Remove(key, INVALID_SOCKET_ID);
+        m->Remove(key, (SocketId)-1);
     }
 }
 
@@ -114,8 +170,6 @@ void SocketMapList(std::vector<SocketId>* ids) {
     SocketMap* m = get_client_side_socket_map();
     if (m) {
         m->List(ids);
-    } else {
-        ids->clear();
     }
 }
 
@@ -209,35 +263,44 @@ void SocketMap::PrintSocketMap(std::ostream& os, void* arg) {
     static_cast<SocketMap*>(arg)->Print(os);
 }
 
-int SocketMap::Insert(const SocketMapKey& key, SocketId* id,
-                      const std::shared_ptr<SocketSSLContext>& ssl_ctx) {
+int SocketMap::Insert(const SocketMapKey& key, SocketId* id) {
+    SocketMapKeyChecksum ck(key);
     std::unique_lock<butil::Mutex> mu(_mutex);
-    SingleConnection* sc = _map.seek(key);
+    SingleConnection* sc = _map.seek(ck);
     if (sc) {
         if (!sc->socket->Failed() ||
-            (sc->socket->health_check_interval() > 0 &&
-             sc->socket->IsHCRelatedRefHeld())/*HC enabled*/) {
+            sc->socket->health_check_interval() > 0/*HC enabled*/) {
             ++sc->ref_count;
             *id = sc->socket->id();
             return 0;
         }
         // A socket w/o HC is failed (permanently), replace it.
-        sc->socket->SetHCRelatedRefReleased(); // set released status to cancel health checking
         SocketUniquePtr ptr(sc->socket);  // Remove the ref added at insertion.
-        _map.erase(key); // in principle, we can override the entry in map w/o
+        _map.erase(ck); // in principle, we can override the entry in map w/o
         // removing and inserting it again. But this would make error branches
         // below have to remove the entry before returning, which is
         // error-prone. We prefer code maintainability here.
         sc = NULL;
     }
+    std::unique_ptr<SSL_CTX, FreeSSLCTX> ssl_ctx(
+        CreateClientSSLContext(key.ssl_options));
+    if (key.ssl_options.enable && !ssl_ctx) {
+        return -1;
+    }
     SocketId tmp_id;
     SocketOptions opt;
-    opt.remote_side = key.peer.addr;
-    opt.initial_ssl_ctx = ssl_ctx;
+    opt.remote_side = key.peer;
+    opt.use_rdma = key.use_rdma;
+    // Can't save SSL_CTX in SocketMap since SingleConnection's desctruction
+    // may happen before Socket's destruction (remove Channel before RPC complete)
+    opt.owns_ssl_ctx = true;
+    opt.ssl_ctx = ssl_ctx.get();
+    opt.sni_name = key.ssl_options.sni_name;
     if (_options.socket_creator->CreateSocket(opt, &tmp_id) != 0) {
         PLOG(FATAL) << "Fail to create socket to " << key.peer;
         return -1;
     }
+    ssl_ctx.release();
     // Add a reference to make sure that sc->socket is always accessible. Not
     // use SocketUniquePtr which cannot put into containers before c++11.
     // The ref will be removed at entry's removal.
@@ -246,9 +309,8 @@ int SocketMap::Insert(const SocketMapKey& key, SocketId* id,
         LOG(FATAL) << "Fail to address SocketId=" << tmp_id;
         return -1;
     }
-    ptr->SetHCRelatedRefHeld(); // set held status
     SingleConnection new_sc = { 1, ptr.release(), 0 };
-    _map[key] = new_sc;
+    _map[ck] = new_sc;
     *id = tmp_id;
     bool need_to_create_bvar = false;
     if (FLAGS_show_socketmap_in_vars && !_exposed_in_bvar) {
@@ -272,13 +334,14 @@ void SocketMap::Remove(const SocketMapKey& key, SocketId expected_id) {
 void SocketMap::RemoveInternal(const SocketMapKey& key,
                                SocketId expected_id,
                                bool remove_orphan) {
+    SocketMapKeyChecksum ck(key);
     std::unique_lock<butil::Mutex> mu(_mutex);
-    SingleConnection* sc = _map.seek(key);
+    SingleConnection* sc = _map.seek(ck);
     if (!sc) {
         return;
     }
     if (!remove_orphan &&
-        (expected_id == INVALID_SOCKET_ID || expected_id == sc->socket->id())) {
+        (expected_id == (SocketId)-1 || expected_id == sc->socket->id())) {
         --sc->ref_count;
     }
     if (sc->ref_count == 0) {
@@ -291,7 +354,7 @@ void SocketMap::RemoveInternal(const SocketMapKey& key,
             sc->no_ref_us = butil::cpuwide_time_us();
         } else {
             Socket* const s = sc->socket;
-            _map.erase(key);
+            _map.erase(ck);
             bool need_to_create_bvar = false;
             if (FLAGS_show_socketmap_in_vars && !_exposed_in_bvar) {
                 _exposed_in_bvar = true;
@@ -305,15 +368,15 @@ void SocketMap::RemoveInternal(const SocketMapKey& key,
                     butil::StringPiece(namebuf, len), PrintSocketMap, this);
             }
             s->ReleaseAdditionalReference(); // release extra ref
-            s->SetHCRelatedRefReleased(); // set released status to cancel health checking
             SocketUniquePtr ptr(s);  // Dereference
         }
     }
 }
 
 int SocketMap::Find(const SocketMapKey& key, SocketId* id) {
+    SocketMapKeyChecksum ck(key);
     BAIDU_SCOPED_LOCK(_mutex);
-    SingleConnection* sc = _map.seek(key);
+    SingleConnection* sc = _map.seek(ck);
     if (sc) {
         *id = sc->socket->id();
         return 0;
@@ -337,14 +400,14 @@ void SocketMap::List(std::vector<butil::EndPoint>* pts) {
     }
 }
 
-void SocketMap::ListOrphans(int64_t defer_us, std::vector<SocketMapKey>* out) {
+void SocketMap::ListOrphans(int64_t defer_us, std::vector<butil::EndPoint>* out) {
     out->clear();
     const int64_t now = butil::cpuwide_time_us();
     BAIDU_SCOPED_LOCK(_mutex);
     for (Map::iterator it = _map.begin(); it != _map.end(); ++it) {
         SingleConnection& sc = it->second;
         if (sc.ref_count == 0 && now - sc.no_ref_us >= defer_us) {
-            out->push_back(it->first);
+            out->push_back(it->first.peer);
         }
     }
 }
@@ -357,7 +420,7 @@ void* SocketMap::RunWatchConnections(void* arg) {
 void SocketMap::WatchConnections() {
     std::vector<SocketId> main_sockets;
     std::vector<SocketId> pooled_sockets;
-    std::vector<SocketMapKey> orphan_sockets;
+    std::vector<butil::EndPoint> orphan_sockets;
     const uint64_t CHECK_INTERVAL_US = 1000000UL;
     while (bthread_usleep(CHECK_INTERVAL_US) == 0) {
         // NOTE: save the gflag which may be reloaded at any time.
@@ -389,7 +452,7 @@ void SocketMap::WatchConnections() {
             _options.defer_close_second;
         ListOrphans(defer_seconds * 1000000L, &orphan_sockets);
         for (size_t i = 0; i < orphan_sockets.size(); ++i) {
-            RemoveInternal(orphan_sockets[i], INVALID_SOCKET_ID, true);
+            RemoveInternal(orphan_sockets[i], (SocketId)-1, true);
         }
     }
 }

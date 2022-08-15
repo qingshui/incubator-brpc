@@ -1,26 +1,28 @@
-// Licensed to the Apache Software Foundation (ASF) under one
-// or more contributor license agreements.  See the NOTICE file
-// distributed with this work for additional information
-// regarding copyright ownership.  The ASF licenses this file
-// to you under the Apache License, Version 2.0 (the
-// "License"); you may not use this file except in compliance
-// with the License.  You may obtain a copy of the License at
-//
-//   http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing,
-// software distributed under the License is distributed on an
-// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-// KIND, either express or implied.  See the License for the
-// specific language governing permissions and limitations
-// under the License.
+// Copyright (c) 2014 Baidu, Inc.
+// 
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+// 
+//     http://www.apache.org/licenses/LICENSE-2.0
+// 
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
+// Authors: Rujie Jiang(jiangrujie@baidu.com)
+//          Ge,Jun(gejun@baidu.com)
 
 #include <inttypes.h>
 #include <gflags/gflags.h>
 #include "butil/fd_guard.h"                 // fd_guard 
 #include "butil/fd_utility.h"               // make_close_on_exec
 #include "butil/time.h"                     // gettimeofday_us
+#include "butil/unique_ptr.h"               // std::unique_ptr
+#include "brpc/rdma/rdma_communication_manager.h"
+#include "brpc/rdma/rdma_endpoint.h"
 #include "brpc/acceptor.h"
 
 
@@ -36,6 +38,8 @@ Acceptor::Acceptor(bthread_keytable_pool_t* pool)
     , _close_idle_tid(INVALID_BTHREAD)
     , _listened_fd(-1)
     , _acception_id(0)
+    , _listened_rdma(NULL)
+    , _rdma_acception_id(0)
     , _empty_cond(&_map_mutex)
     , _ssl_ctx(NULL) {
 }
@@ -45,8 +49,9 @@ Acceptor::~Acceptor() {
     Join();
 }
 
-int Acceptor::StartAccept(int listened_fd, int idle_timeout_sec,
-                          const std::shared_ptr<SocketSSLContext>& ssl_ctx) {
+int Acceptor::StartAccept(
+    int listened_fd, rdma::RdmaCommunicationManager* listened_rdma,
+    int idle_timeout_sec, SSL_CTX* ssl_ctx) {
     if (listened_fd < 0) {
         LOG(FATAL) << "Invalid listened_fd=" << listened_fd;
         return -1;
@@ -85,8 +90,20 @@ int Acceptor::StartAccept(int listened_fd, int idle_timeout_sec,
         LOG(FATAL) << "Fail to create _acception_id";
         return -1;
     }
-    
+
+    if (listened_rdma) {
+        // Start rdmacm accept, with another Socket.
+        options.fd = listened_rdma->GetFD();
+        options.on_edge_triggered_events = OnNewRdmaConnections;
+        if (Socket::Create(options, &_rdma_acception_id) < 0) {
+            LOG(FATAL) << "Fail to create _rdma_acception_id";
+            Socket::SetFailed(_acception_id);
+            return -1;
+        }
+    }
+
     _listened_fd = listened_fd;
+    _listened_rdma = listened_rdma;
     _status = RUNNING;
     return 0;
 }
@@ -123,6 +140,9 @@ void Acceptor::StopAccept(int /*closewait_ms*/) {
 
     // Don't set _acception_id to 0 because BeforeRecycle needs it.
     Socket::SetFailed(_acception_id);
+    if (_rdma_acception_id > 0) {
+        Socket::SetFailed(_rdma_acception_id);
+    }
 
     // SetFailed all existing connections. Connections added after this piece
     // of code will be SetFailed directly in OnNewConnectionsUntilEAGAIN
@@ -165,7 +185,7 @@ void Acceptor::Join() {
         return;
     }
     // `_listened_fd' will be set to -1 once it has been recycled
-    while (_listened_fd > 0 || !_socket_map.empty()) {
+    while (_listened_fd > 0 || _listened_rdma || !_socket_map.empty()) {
         _empty_cond.Wait();
     }
     const int saved_idle_timeout_sec = _idle_timeout_sec;
@@ -240,10 +260,9 @@ void Acceptor::ListConnections(std::vector<SocketId>* conn_list) {
 
 void Acceptor::OnNewConnectionsUntilEAGAIN(Socket* acception) {
     while (1) {
-        struct sockaddr_storage in_addr;
-        bzero(&in_addr, sizeof(in_addr));
+        struct sockaddr in_addr;
         socklen_t in_len = sizeof(in_addr);
-        butil::fd_guard in_fd(accept(acception->fd(), (sockaddr*)&in_addr, &in_len));
+        butil::fd_guard in_fd(accept(acception->fd(), &in_addr, &in_len));
         if (in_fd < 0) {
             // no EINTR because listened fd is non-blocking.
             if (errno == EAGAIN) {
@@ -270,10 +289,11 @@ void Acceptor::OnNewConnectionsUntilEAGAIN(Socket* acception) {
         SocketOptions options;
         options.keytable_pool = am->_keytable_pool;
         options.fd = in_fd;
-        butil::sockaddr2endpoint(&in_addr, in_len, &options.remote_side);
+        options.remote_side = butil::EndPoint(*(sockaddr_in*)&in_addr);
         options.user = acception->user();
         options.on_edge_triggered_events = InputMessenger::OnNewMessages;
-        options.initial_ssl_ctx = am->_ssl_ctx;
+        options.ssl_ctx = am->_ssl_ctx;
+        options.use_rdma = (am->_listened_rdma != NULL);
         if (Socket::Create(options, &socket_id) != 0) {
             LOG(ERROR) << "Fail to create Socket";
             continue;
@@ -323,6 +343,43 @@ void Acceptor::OnNewConnections(Socket* acception) {
     } while (acception->MoreReadEvents(&progress));
 }
 
+void Acceptor::OnNewRdmaConnectionsUntilEAGAIN(Socket* acception) {
+    Acceptor* am = dynamic_cast<Acceptor*>(acception->user());
+    if (NULL == am) {
+        LOG(FATAL) << "Impossible! acception->user() MUST be Acceptor";
+        acception->SetFailed(EINVAL, "Impossible! acception->user() MUST be Acceptor");
+        return;
+    }
+    while (1) {
+        char* data = NULL;
+        size_t data_len = 0;
+        std::unique_ptr<rdma::RdmaCommunicationManager> rcm(
+                am->_listened_rdma->GetRequest(&data, &data_len));
+        if (rcm == NULL) {
+            if (errno == EAGAIN) {
+                return;
+            }
+            PLOG_EVERY_SECOND(ERROR) << "Fail to accept from listened_rdma";
+            continue;
+        }
+        if (rdma::RdmaEndpoint::InitializeFromAccept(
+                    rcm.get(), data, data_len) < 0) {
+            continue;
+        }
+        rcm.release();
+    }
+}
+
+void Acceptor::OnNewRdmaConnections(Socket* acception) {
+    int progress = Socket::PROGRESS_INIT;
+    do {
+        OnNewRdmaConnectionsUntilEAGAIN(acception);
+        if (acception->Failed()) {
+            return;
+        }
+    } while (acception->MoreReadEvents(&progress));
+}
+
 void Acceptor::BeforeRecycle(Socket* sock) {
     BAIDU_SCOPED_LOCK(_map_mutex);
     if (sock->id() == _acception_id) {
@@ -330,6 +387,13 @@ void Acceptor::BeforeRecycle(Socket* sock) {
         // so that we are ensured no more events will arrive (and `Join'
         // will return to its caller)
         _listened_fd = -1;
+        _empty_cond.Broadcast();
+        return;
+    }
+    if (sock->id() == _rdma_acception_id) {
+        sock->_fd = -1;  // avoid RemoveConsumer twice
+        delete _listened_rdma;
+        _listened_rdma = NULL;
         _empty_cond.Broadcast();
         return;
     }
