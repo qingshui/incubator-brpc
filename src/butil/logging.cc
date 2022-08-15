@@ -141,6 +141,10 @@ DEFINE_bool(log_hostname, false, "Add host after pid in each log so"
 
 DEFINE_bool(log_year, false, "Log year in datetime part in each log");
 
+bool is_log_as_json(void) {
+    return  FLAGS_log_as_json;
+}
+
 namespace {
 
 LoggingDestination logging_destination = LOG_DEFAULT;

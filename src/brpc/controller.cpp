@@ -76,9 +76,6 @@ BAIDU_REGISTER_ERRNO(brpc::ELIMIT, "Reached server's max_concurrency");
 BAIDU_REGISTER_ERRNO(brpc::ECLOSE, "Close socket initiatively");
 BAIDU_REGISTER_ERRNO(brpc::EITP, "Bad Itp response");
 
-namespace logging {
-DECLARE_bool(log_as_json);
-};
 namespace brpc {
 
 DEFINE_bool(graceful_quit_on_sigterm, false,
@@ -1536,7 +1533,7 @@ void Controller::FlushSessionKV(std::ostream& os) {
         pRID = &request_id();
     }
 
-    if (logging::FLAGS_log_as_json) {
+    if (logging::is_log_as_json()) {
         if (pRID) {
             os << "\"" BRPC_REQ_ID "\":\"" << *pRID << "\",";
         }
@@ -1565,14 +1562,14 @@ void Controller::DoPrintLogPrefix(std::ostream& os) const {
     if (!request_id().empty()) {
         pRID = &request_id();
         if (pRID) {
-            if (logging::FLAGS_log_as_json) {
+            if (logging::is_log_as_json()) {
                 os << BRPC_REQ_ID "\":\"" << *pRID << "\",";
             } else {
                 os << BRPC_REQ_ID BRPC_KV_SEP << *pRID << " ";
             }
         }
     }
-    if (logging::FLAGS_log_as_json) {
+    if (logging::is_log_as_json()) {
         os << "\"M\":\"";
     }
 }

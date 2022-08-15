@@ -1069,6 +1069,7 @@ inline LogStream& noflush(LogStream& ls) {
     ls.DontFlushOnce();
     return ls;
 }
+extern bool is_log_as_json(void);
 
 }  // namespace logging
 
