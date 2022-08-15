@@ -31,6 +31,8 @@
 #include <brpc/details/http_message.h>
 #include "info_thread.h"
 
+namespace brpc {
+
 DEFINE_string(dir, "", "The directory of dumped requests");
 DEFINE_int32(times, 1, "Repeat replaying for so many times");
 DEFINE_int32(qps, 0, "Limit QPS if this flag is positive");
@@ -132,7 +134,7 @@ butil::atomic<int> g_thread_offset(0);
 static void* replay_thread(void* arg) {
     ChannelGroup* chan_group = static_cast<ChannelGroup*>(arg);
     const int thread_offset = g_thread_offset.fetch_add(1, butil::memory_order_relaxed);
-    double req_rate = FLAGS_qps / (double)FLAGS_thread_num;
+    double req_rate = brpc::FLAGS_qps / (double)FLAGS_thread_num;
     brpc::SerializedRequest req;
     brpc::NsheadMessage nshead_req;
     std::deque<int64_t> timeq;
@@ -219,18 +221,19 @@ static void* replay_thread(void* arg) {
     }
     return NULL;
 }
+};
 
 int main(int argc, char* argv[]) {
     // Parse gflags. We recommend you to use gflags as well.
     GFLAGS_NS::ParseCommandLineFlags(&argc, &argv, true);
 
-    if (FLAGS_dir.empty() ||
-        !butil::DirectoryExists(butil::FilePath(FLAGS_dir))) {
+    if (brpc::FLAGS_dir.empty() ||
+        !butil::DirectoryExists(butil::FilePath(brpc::FLAGS_dir))) {
         LOG(ERROR) << "--dir=<dir-of-dumped-files> is required";
         return -1;
     }
 
-    if (FLAGS_dummy_port >= 0) {
+    if (brpc::FLAGS_dummy_port >= 0) {
         brpc::StartDummyServerAt(FLAGS_dummy_port);
     }
     
@@ -240,33 +243,33 @@ int main(int argc, char* argv[]) {
         return -1;
     }
 
-    if (FLAGS_thread_num <= 0) {
-        if (FLAGS_qps <= 0) { // unlimited qps
-            FLAGS_thread_num = 50;
+    if (brpc::FLAGS_thread_num <= 0) {
+        if (brpc::FLAGS_qps <= 0) { // unlimited qps
+            brpc::FLAGS_thread_num = 50;
         } else {
-            FLAGS_thread_num = FLAGS_qps / 10000;
-            if (FLAGS_thread_num < 1) {
-                FLAGS_thread_num = 1;
+            brpc::FLAGS_thread_num = brpc::FLAGS_qps / 10000;
+            if (brpc::FLAGS_thread_num < 1) {
+                brpc::FLAGS_thread_num = 1;
             }
-            if (FLAGS_thread_num > 50) {
-                FLAGS_thread_num = 50;
+            if (brpc::FLAGS_thread_num > 50) {
+                brpc::FLAGS_thread_num = 50;
             }
         }
     }
 
     std::vector<bthread_t> bids;
     std::vector<pthread_t> pids;
-    if (!FLAGS_use_bthread) {
-        pids.resize(FLAGS_thread_num);
-        for (int i = 0; i < FLAGS_thread_num; ++i) {
+    if (!brpc::FLAGS_use_bthread) {
+        pids.resize(brpc::FLAGS_thread_num);
+        for (int i = 0; i < brpc::FLAGS_thread_num; ++i) {
             if (pthread_create(&pids[i], NULL, replay_thread, &chan_group) != 0) {
                 LOG(ERROR) << "Fail to create pthread";
                 return -1;
             }
         }
     } else {
-        bids.resize(FLAGS_thread_num);
-        for (int i = 0; i < FLAGS_thread_num; ++i) {
+        bids.resize(brpc::FLAGS_thread_num);
+        for (int i = 0; i < brpc::FLAGS_thread_num; ++i) {
             if (bthread_start_background(
                     &bids[i], NULL, replay_thread, &chan_group) != 0) {
                 LOG(ERROR) << "Fail to create bthread";
@@ -285,8 +288,8 @@ int main(int argc, char* argv[]) {
         return -1;
     }
 
-    for (int i = 0; i < FLAGS_thread_num; ++i) {
-        if (!FLAGS_use_bthread) {
+    for (int i = 0; i < brpc::FLAGS_thread_num; ++i) {
+        if (!brpc::FLAGS_use_bthread) {
             pthread_join(pids[i], NULL);
         } else {
             bthread_join(bids[i], NULL);

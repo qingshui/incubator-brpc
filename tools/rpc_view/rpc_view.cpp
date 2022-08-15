@@ -22,10 +22,11 @@
 #include <brpc/channel.h>
 #include "view.pb.h"
 
+namespace brpc {
 DEFINE_int32(port, 8888, "TCP Port of this server");
 DEFINE_string(target, "", "The server to view");
 DEFINE_int32(timeout_ms, 5000, "Timeout for calling the server to view");
-
+};
 // handle HTTP response of accessing builtin services of the target server.
 static void handle_response(brpc::Controller* client_cntl,
                             std::string target,
@@ -136,7 +137,7 @@ public:
         // query "seconds", we set the timeout to be longer than "seconds".
         const std::string* seconds =
             server_cntl->http_request().uri().GetQuery("seconds");
-        int64_t timeout_ms = FLAGS_timeout_ms;
+        int64_t timeout_ms = brpc::FLAGS_timeout_ms;
         if (seconds) {
             timeout_ms += atoll(seconds->c_str()) * 1000;
         }
@@ -154,7 +155,7 @@ public:
 
 int main(int argc, char* argv[]) {
     GFLAGS_NS::ParseCommandLineFlags(&argc, &argv, true);
-    if (FLAGS_target.empty() &&
+    if (brpc::FLAGS_target.empty() &&
         (argc != 2 || 
          GFLAGS_NS::SetCommandLineOption("target", argv[1]).empty())) {
         LOG(ERROR) << "Usage: ./rpc_view <ip>:<port>";
@@ -167,7 +168,7 @@ int main(int argc, char* argv[]) {
     server.set_version("rpc_view_server");
     brpc::ServerOptions server_opt;
     server_opt.http_master_service = new ViewServiceImpl;
-    if (server.Start(FLAGS_port, &server_opt) != 0) {
+    if (server.Start(brpc::FLAGS_port, &server_opt) != 0) {
         LOG(ERROR) << "Fail to start ViewServer";
         return -1;
     }
