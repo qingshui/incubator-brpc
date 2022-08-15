@@ -29,7 +29,7 @@
 #include "bvar/detail/sampler.h"                  // ReducerSampler
 #include "bvar/detail/series.h"
 #include "bvar/window.h"
-
+namespace brpc {
 namespace bvar {
 
 // Reduce multiple values into one with `Op': e1 Op e2 Op e3 ...
@@ -324,5 +324,5 @@ public:
 };
 
 }  // namespace bvar
-
+}
 #endif  //BVAR_REDUCER_H

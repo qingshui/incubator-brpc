@@ -48,9 +48,9 @@ inline uint64_t make_id(uint32_t version, slot_id_t slot) {
 }  // namespace anonymous
 
 struct ExecutionQueueVars {
-    bvar::Adder<int64_t> running_task_count;
-    bvar::Adder<int64_t> execq_count;
-    bvar::Adder<int64_t> execq_active_count;
+    brpc::bvar::Adder<int64_t> running_task_count;
+    brpc::bvar::Adder<int64_t> execq_count;
+    brpc::bvar::Adder<int64_t> execq_active_count;
     
     ExecutionQueueVars();
 };

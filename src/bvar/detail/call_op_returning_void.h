@@ -19,7 +19,7 @@
 
 #ifndef  BVAR_DETAIL_CALL_OP_RETURNING_VOID_H
 #define  BVAR_DETAIL_CALL_OP_RETURNING_VOID_H
-
+namespace brpc {
 namespace bvar {
 namespace detail {
 
@@ -31,5 +31,5 @@ inline void call_op_returning_void(
 
 }  // namespace detail
 }  // namespace bvar
-
+}
 #endif  //BVAR_DETAIL_CALL_OP_RETURNING_VOID_H

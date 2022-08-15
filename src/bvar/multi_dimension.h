@@ -26,7 +26,7 @@
 #include "butil/containers/doubly_buffered_data.h"   // DBD
 #include "butil/containers/flat_map.h"               // butil::FlatMap
 #include "bvar/mvariable.h"
-
+namespace brpc {
 namespace bvar {
 
 constexpr uint64_t MAX_MULTI_DIMENSION_STATS_COUNT = 20000;
@@ -134,6 +134,7 @@ private:
 };
 
 } // namespace bvar
+}
 
 #include "bvar/multi_dimension_inl.h"
 

@@ -446,12 +446,12 @@ int64_t TaskControl::get_cumulated_signal_count() {
     return c;
 }
 
-bvar::LatencyRecorder* TaskControl::create_exposed_pending_time() {
+brpc::bvar::LatencyRecorder* TaskControl::create_exposed_pending_time() {
     bool is_creator = false;
     _pending_time_mutex.lock();
-    bvar::LatencyRecorder* pt = _pending_time.load(butil::memory_order_consume);
+    brpc::bvar::LatencyRecorder* pt = _pending_time.load(butil::memory_order_consume);
     if (!pt) {
-        pt = new bvar::LatencyRecorder;
+        pt = new brpc::bvar::LatencyRecorder;
         _pending_time.store(pt, butil::memory_order_release);
         is_creator = true;
     }

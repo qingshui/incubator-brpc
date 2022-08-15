@@ -24,7 +24,7 @@
 #include "bvar/reducer.h"
 #include "bvar/passive_status.h"
 #include "bvar/detail/percentile.h"
-
+namespace brpc {
 namespace bvar {
 namespace detail {
 
@@ -160,5 +160,6 @@ public:
 std::ostream& operator<<(std::ostream& os, const LatencyRecorder&);
 
 }  // namespace bvar
+}
 
 #endif  //BVAR_LATENCY_RECORDER_H

@@ -325,14 +325,14 @@ void TimerThread::run() {
 
     // vars
     size_t nscheduled = 0;
-    bvar::PassiveStatus<size_t> nscheduled_var(deref_value<size_t>, &nscheduled);
-    bvar::PerSecond<bvar::PassiveStatus<size_t> > nscheduled_second(&nscheduled_var);
+    brpc::bvar::PassiveStatus<size_t> nscheduled_var(deref_value<size_t>, &nscheduled);
+    brpc::bvar::PerSecond<brpc::bvar::PassiveStatus<size_t> > nscheduled_second(&nscheduled_var);
     size_t ntriggered = 0;
-    bvar::PassiveStatus<size_t> ntriggered_var(deref_value<size_t>, &ntriggered);
-    bvar::PerSecond<bvar::PassiveStatus<size_t> > ntriggered_second(&ntriggered_var);
+    brpc::bvar::PassiveStatus<size_t> ntriggered_var(deref_value<size_t>, &ntriggered);
+    brpc::bvar::PerSecond<brpc::bvar::PassiveStatus<size_t> > ntriggered_second(&ntriggered_var);
     double busy_seconds = 0;
-    bvar::PassiveStatus<double> busy_seconds_var(deref_value<double>, &busy_seconds);
-    bvar::PerSecond<bvar::PassiveStatus<double> > busy_seconds_second(&busy_seconds_var);
+    brpc::bvar::PassiveStatus<double> busy_seconds_var(deref_value<double>, &busy_seconds);
+    brpc::bvar::PerSecond<brpc::bvar::PassiveStatus<double> > busy_seconds_second(&busy_seconds_var);
     if (!_options.bvar_prefix.empty()) {
         nscheduled_second.expose_as(_options.bvar_prefix, "scheduled_second");
         ntriggered_second.expose_as(_options.bvar_prefix, "triggered_second");

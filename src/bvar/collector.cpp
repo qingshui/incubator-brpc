@@ -22,7 +22,7 @@
 #include "butil/memory/singleton_on_pthread_once.h"
 #include "bvar/bvar.h"
 #include "bvar/collector.h"
-
+namespace brpc {
 namespace bvar {
 
 // TODO: Do we need to expose this flag? Dumping thread may dump different
@@ -432,3 +432,4 @@ DisplaySamplingRatio::DisplaySamplingRatio(const char* name,
 }
 
 }  // namespace bvar
+}

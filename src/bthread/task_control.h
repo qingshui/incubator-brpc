@@ -88,8 +88,8 @@ private:
 
     static void* worker_thread(void* task_control);
 
-    bvar::LatencyRecorder& exposed_pending_time();
-    bvar::LatencyRecorder* create_exposed_pending_time();
+    brpc::bvar::LatencyRecorder& exposed_pending_time();
+    brpc::bvar::LatencyRecorder* create_exposed_pending_time();
 
     butil::atomic<size_t> _ngroup;
     TaskGroup** _groups;
@@ -99,24 +99,24 @@ private:
     butil::atomic<int> _concurrency;
     std::vector<pthread_t> _workers;
 
-    bvar::Adder<int64_t> _nworkers;
+    brpc::bvar::Adder<int64_t> _nworkers;
     butil::Mutex _pending_time_mutex;
-    butil::atomic<bvar::LatencyRecorder*> _pending_time;
-    bvar::PassiveStatus<double> _cumulated_worker_time;
-    bvar::PerSecond<bvar::PassiveStatus<double> > _worker_usage_second;
-    bvar::PassiveStatus<int64_t> _cumulated_switch_count;
-    bvar::PerSecond<bvar::PassiveStatus<int64_t> > _switch_per_second;
-    bvar::PassiveStatus<int64_t> _cumulated_signal_count;
-    bvar::PerSecond<bvar::PassiveStatus<int64_t> > _signal_per_second;
-    bvar::PassiveStatus<std::string> _status;
-    bvar::Adder<int64_t> _nbthreads;
+    butil::atomic<brpc::bvar::LatencyRecorder*> _pending_time;
+    brpc::bvar::PassiveStatus<double> _cumulated_worker_time;
+    brpc::bvar::PerSecond<brpc::bvar::PassiveStatus<double> > _worker_usage_second;
+    brpc::bvar::PassiveStatus<int64_t> _cumulated_switch_count;
+    brpc::bvar::PerSecond<brpc::bvar::PassiveStatus<int64_t> > _switch_per_second;
+    brpc::bvar::PassiveStatus<int64_t> _cumulated_signal_count;
+    brpc::bvar::PerSecond<brpc::bvar::PassiveStatus<int64_t> > _signal_per_second;
+    brpc::bvar::PassiveStatus<std::string> _status;
+    brpc::bvar::Adder<int64_t> _nbthreads;
 
     static const int PARKING_LOT_NUM = 4;
     ParkingLot _pl[PARKING_LOT_NUM];
 };
 
-inline bvar::LatencyRecorder& TaskControl::exposed_pending_time() {
-    bvar::LatencyRecorder* pt = _pending_time.load(butil::memory_order_consume);
+inline brpc::bvar::LatencyRecorder& TaskControl::exposed_pending_time() {
+  brpc::bvar::LatencyRecorder* pt = _pending_time.load(butil::memory_order_consume);
     if (!pt) {
         pt = create_exposed_pending_time();
     }

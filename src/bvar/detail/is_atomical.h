@@ -19,7 +19,7 @@
 #define BVAR_DETAIL_IS_ATOMICAL_H
 
 #include "butil/type_traits.h"
-
+namespace brpc {
 namespace bvar {
 namespace detail {
 template <class T> struct is_atomical
@@ -37,5 +37,6 @@ template <class T> struct is_atomical<const volatile T> : is_atomical<T> { };
 
 }  // namespace detail
 }  // namespace bvar
+}
 
 #endif

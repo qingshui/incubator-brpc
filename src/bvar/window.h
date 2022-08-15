@@ -28,6 +28,7 @@
 #include "bvar/detail/series.h"
 #include "bvar/variable.h"
 
+namespace brpc {
 namespace bvar {
 
 DECLARE_int32(bvar_dump_interval);
@@ -239,5 +240,6 @@ public:
 };
 
 }  // namespace bvar
+}
 
 #endif  //BVAR_WINDOW_H

@@ -37,7 +37,7 @@
 #include "butil/process_util.h"            // ReadCommandLine
 #include "butil/popen.h"                   // read_command_output
 #include "bvar/passive_status.h"
-
+namespace brpc {
 namespace bvar {
 
 template <class T, class M> M get_member_type(M T::*);
@@ -871,7 +871,7 @@ PassiveStatus<std::string> g_work_dir("process_work_dir", get_work_dir, NULL);
 #undef BVAR_DEFINE_RUSAGE_FIELD2
 
 }  // namespace bvar
-
+}
 // In the same scope where timeval is defined. Required by clang.
 inline std::ostream& operator<<(std::ostream& os, const timeval& tm) {
     return os << tm.tv_sec << '.' << std::setw(6) << std::setfill('0') << tm.tv_usec;

@@ -34,7 +34,7 @@ namespace boost {
 class any;
 }
 #endif
-
+namespace brpc {
 namespace bvar {
 
 DECLARE_bool(save_series);
@@ -233,11 +233,11 @@ private:
 void to_underscored_name(std::string* out, const butil::StringPiece& name);
 
 }  // namespace bvar
-
+}
 // Make variables printable.
 namespace std {
 
-inline ostream& operator<<(ostream &os, const ::bvar::Variable &var) {
+inline ostream& operator<<(ostream &os, const ::brpc::bvar::Variable &var) {
     var.describe(os, false);
     return os;
 }

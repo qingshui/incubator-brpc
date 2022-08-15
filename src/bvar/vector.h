@@ -23,6 +23,7 @@
 #include <ostream>
 #include <gflags/gflags_declare.h>
 
+namespace brpc {
 namespace bvar {
 
 DECLARE_bool(quote_vector);
@@ -117,5 +118,6 @@ template <typename T, size_t N>
 struct is_vector<Vector<T,N> > : public butil::true_type {};
 
 }  // namespace bvar
+}
 
 #endif  //BVAR_VECTOR_H

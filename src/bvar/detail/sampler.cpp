@@ -24,7 +24,7 @@
 #include "bvar/detail/sampler.h"
 #include "bvar/passive_status.h"
 #include "bvar/window.h"
-
+namespace brpc {
 namespace bvar {
 namespace detail {
 
@@ -214,3 +214,4 @@ void Sampler::destroy() {
 
 }  // namespace detail
 }  // namespace bvar
+}

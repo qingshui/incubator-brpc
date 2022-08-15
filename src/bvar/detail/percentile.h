@@ -32,7 +32,7 @@
 #include "bvar/detail/combiner.h"       // AgentCombiner
 #include "bvar/detail/sampler.h"        // ReducerSampler
 #include "butil/fast_rand.h"
-
+namespace brpc {
 namespace bvar {
 namespace detail {
 
@@ -501,5 +501,5 @@ private:
 
 }  // namespace detail
 }  // namespace bvar
-
+}
 #endif  //BVAR_DETAIL_PERCENTILE_H

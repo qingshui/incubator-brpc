@@ -143,9 +143,9 @@ static double get_cumulated_cputime_from_this(void* arg) {
 }
 
 void TaskGroup::run_main_task() {
-    bvar::PassiveStatus<double> cumulated_cputime(
+  brpc::bvar::PassiveStatus<double> cumulated_cputime(
         get_cumulated_cputime_from_this, this);
-    std::unique_ptr<bvar::PerSecond<bvar::PassiveStatus<double> > > usage_bvar;
+    std::unique_ptr<brpc::bvar::PerSecond<brpc::bvar::PassiveStatus<double> > > usage_bvar;
 
     TaskGroup* dummy = this;
     bthread_t tid;
@@ -165,7 +165,7 @@ void TaskGroup::run_main_task() {
             snprintf(name, sizeof(name), "bthread_worker_usage_%ld",
                      (long)syscall(SYS_gettid));
 #endif
-            usage_bvar.reset(new bvar::PerSecond<bvar::PassiveStatus<double> >
+            usage_bvar.reset(new brpc::bvar::PerSecond<brpc::bvar::PassiveStatus<double> >
                              (name, &cumulated_cputime, 1));
         }
     }

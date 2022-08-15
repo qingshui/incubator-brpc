@@ -26,7 +26,7 @@
 #include <string>                       // std::string
 #include "butil/macros.h"               // DISALLOW_COPY_AND_ASSIGN
 #include "butil/strings/string_piece.h" // butil::StringPiece
-
+namespace brpc {
 namespace bvar {
 
 class Dumper;
@@ -121,5 +121,5 @@ protected:
 };
 
 } // namespace bvar
-
+}
 #endif  // BVAR_MVARIABLE_H

@@ -32,7 +32,7 @@
 #include "butil/macros.h"                    // BAIDU_CACHELINE_ALIGNMENT
 #include "butil/scoped_lock.h"
 #include "butil/logging.h"
-
+namespace brpc {
 namespace bvar {
 namespace detail {
 
@@ -200,5 +200,5 @@ __thread std::vector<typename AgentGroup<Agent>::ThreadBlock *>
 
 }  // namespace detail
 }  // namespace bvar
-
+}
 #endif  //BVAR_DETAIL__AGENT_GROUP_H

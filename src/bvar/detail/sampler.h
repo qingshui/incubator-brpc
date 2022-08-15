@@ -28,7 +28,7 @@
 #include "butil/type_traits.h"           // is_same
 #include "butil/time.h"                  // gettimeofday_us
 #include "butil/class_name.h"
-
+namespace brpc {
 namespace bvar {
 namespace detail {
 
@@ -219,5 +219,5 @@ private:
 
 }  // namespace detail
 }  // namespace bvar
-
+}
 #endif  // BVAR_DETAIL_SAMPLER_H

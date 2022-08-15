@@ -22,7 +22,7 @@
 
 #include "bvar/variable.h"
 #include "bvar/reducer.h"
-
+namespace brpc {
 namespace bvar {
 
 // Display a updated-by-need value. This is done by passing in an user callback
@@ -276,5 +276,5 @@ public:
 
 
 }  // namespace bvar
-
+}
 #endif  //BVAR_PASSIVE_STATUS_H
