@@ -34,7 +34,6 @@
 #define SO_REUSEPORT    15
 #endif
 //This option is supported since Linux 3.9.
-DEFINE_bool(reuse_port, false, "turn on support for SO_REUSEPORT socket option.");
 
 __BEGIN_DECLS
 int BAIDU_WEAK bthread_connect(
@@ -44,6 +43,8 @@ int BAIDU_WEAK bthread_connect(
 __END_DECLS
 
 namespace butil {
+
+DEFINE_bool(brpc_reuse_port, false, "turn on support for SO_REUSEPORT socket option.");
 
 int str2ip(const char* ip_str, ip_t* ip) {
     // ip_str can be NULL when called by EndPoint(0, ...)
@@ -321,7 +322,7 @@ int tcp_listen(EndPoint point, bool reuse_addr) {
         }
     }
 
-    if (FLAGS_reuse_port) {
+    if (FLAGS_brpc_reuse_port) {
         const int on = 1;
         if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEPORT,
                        &on, sizeof(on)) != 0) {
