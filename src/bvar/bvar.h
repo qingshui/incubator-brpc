@@ -28,4 +28,6 @@
 #include "bvar/gflag.h"
 #include "bvar/scoped_timer.h"
 
+using namespace brpc;
+
 #endif  //BVAR_BVAR_H
