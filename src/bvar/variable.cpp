@@ -33,14 +33,14 @@
 namespace brpc {
 namespace bvar {
 
-DEFINE_bool(save_series, true,
+DEFINE_bool(brpc_save_series, true,
             "Save values of last 60 seconds, last 60 minutes,"
             " last 24 hours and last 30 days for ploting");
 
-DEFINE_bool(quote_vector, true,
+DEFINE_bool(brpc_quote_vector, true,
             "Quote description of Vector<> to make it valid to noah");
 
-DEFINE_bool(bvar_abort_on_same_name, false,
+DEFINE_bool(brpc_bvar_abort_on_same_name, false,
             "Abort when names of bvar are same");
 // Remember abort request before bvar_abort_on_same_name is initialized.
 static bool s_bvar_may_abort = false;
@@ -54,10 +54,10 @@ static bool validate_bvar_abort_on_same_name(const char*, bool v) {
     return true;
 }
 const bool ALLOW_UNUSED dummy_bvar_abort_on_same_name = ::GFLAGS_NS::RegisterFlagValidator(
-    &FLAGS_bvar_abort_on_same_name, validate_bvar_abort_on_same_name);
+    &FLAGS_brpc_bvar_abort_on_same_name, validate_bvar_abort_on_same_name);
 
 
-DEFINE_bool(bvar_log_dumpped,  false,
+DEFINE_bool(brpc_bvar_log_dumpped,  false,
             "[For debugging] print dumpped info"
             " into logstream before call Dumpper");
 
@@ -164,7 +164,7 @@ int Variable::expose_impl(const butil::StringPiece& prefix,
             return 0;
         }
     }
-    if (FLAGS_bvar_abort_on_same_name) {
+    if (FLAGS_brpc_bvar_abort_on_same_name) {
         LOG(FATAL) << "Abort due to name conflict";
         abort();
     } else if (!s_bvar_may_abort) {
@@ -477,7 +477,7 @@ int Variable::dump_exposed(Dumper* dumper, const DumpOptions* poptions) {
                                   true);
 
     std::ostringstream dumpped_info;
-    const bool log_dummped = FLAGS_bvar_log_dumpped;
+    const bool log_dummped = FLAGS_brpc_bvar_log_dumpped;
 
     if (white_matcher.wildcards().empty() &&
         !white_matcher.exact_names().empty()) {
@@ -726,7 +726,7 @@ static void* dumping_thread(void*) {
             return NULL;
         }
 
-        if (FLAGS_bvar_dump && !filename.empty()) {
+        if (FLAGS_brpc_bvar_dump && !filename.empty()) {
             // Replace first <app> in filename with program name. We can't use
             // pid because a same binary should write the data to the same 
             // place, otherwise restarting of app may confuse noah with a lot 
@@ -739,7 +739,7 @@ static void* dumping_thread(void*) {
             if (last_filename != filename) {
                 last_filename = filename;
                 LOG(INFO) << "Write all bvar to " << filename << " every "
-                          << FLAGS_bvar_dump_interval << " seconds.";
+                          << FLAGS_brpc_bvar_dump_interval << " seconds.";
             }
             const size_t pos2 = prefix.find("<app>");
             if (pos2 != std::string::npos) {
@@ -757,7 +757,7 @@ static void* dumping_thread(void*) {
         // this thread in gflag validators. If this thread dumps just after
         // waking up from the condition, the gflags may not even be updated.
         const int post_sleep_ms = 50;
-        int cond_sleep_ms = FLAGS_bvar_dump_interval * 1000 - post_sleep_ms;
+        int cond_sleep_ms = FLAGS_brpc_bvar_dump_interval * 1000 - post_sleep_ms;
         if (cond_sleep_ms < 0) {
             LOG(ERROR) << "Bad cond_sleep_ms=" << cond_sleep_ms;
             cond_sleep_ms = 10000;
@@ -795,7 +795,7 @@ static bool validate_bvar_dump(const char*, bool enabled) {
     return true;
 }
 const bool ALLOW_UNUSED dummy_bvar_dump = ::GFLAGS_NS::RegisterFlagValidator(
-    &FLAGS_bvar_dump, validate_bvar_dump);
+    &FLAGS_brpc_bvar_dump, validate_bvar_dump);
 
 // validators (to make these gflags reloadable in brpc)
 static bool validate_bvar_dump_interval(const char*, int32_t v) {
@@ -810,11 +810,11 @@ static bool validate_bvar_dump_interval(const char*, int32_t v) {
     return true;
 }
 const bool ALLOW_UNUSED dummy_bvar_dump_interval = ::GFLAGS_NS::RegisterFlagValidator(
-    &FLAGS_bvar_dump_interval, validate_bvar_dump_interval);
+    &FLAGS_brpc_bvar_dump_interval, validate_bvar_dump_interval);
 
 static bool validate_bvar_log_dumpped(const char *, bool) { return true; }
 const bool ALLOW_UNUSED dummy_bvar_log_dumpped = ::GFLAGS_NS::RegisterFlagValidator(
-        &FLAGS_bvar_log_dumpped, validate_bvar_log_dumpped);
+        &FLAGS_brpc_bvar_log_dumpped, validate_bvar_log_dumpped);
 
 static bool wakeup_dumping_thread(const char*, const std::string&) {
     // We're modifying a flag, wake up dumping_thread to generate
@@ -824,15 +824,15 @@ static bool wakeup_dumping_thread(const char*, const std::string&) {
 }
 
 const bool ALLOW_UNUSED dummy_bvar_dump_file = ::GFLAGS_NS::RegisterFlagValidator(
-    &FLAGS_bvar_dump_file, wakeup_dumping_thread);
+    &FLAGS_brpc_bvar_dump_file, wakeup_dumping_thread);
 const bool ALLOW_UNUSED dummy_bvar_dump_filter = ::GFLAGS_NS::RegisterFlagValidator(
-    &FLAGS_bvar_dump_include, wakeup_dumping_thread);
+    &FLAGS_brpc_bvar_dump_include, wakeup_dumping_thread);
 const bool ALLOW_UNUSED dummy_bvar_dump_exclude = ::GFLAGS_NS::RegisterFlagValidator(
-    &FLAGS_bvar_dump_exclude, wakeup_dumping_thread);
+    &FLAGS_brpc_bvar_dump_exclude, wakeup_dumping_thread);
 const bool ALLOW_UNUSED dummy_bvar_dump_prefix = ::GFLAGS_NS::RegisterFlagValidator(
-    &FLAGS_bvar_dump_prefix, wakeup_dumping_thread);
+    &FLAGS_brpc_bvar_dump_prefix, wakeup_dumping_thread);
 const bool ALLOW_UNUSED dummy_bvar_dump_tabs = ::GFLAGS_NS::RegisterFlagValidator(
-    &FLAGS_bvar_dump_tabs, wakeup_dumping_thread);
+    &FLAGS_brpc_bvar_dump_tabs, wakeup_dumping_thread);
 
 void to_underscored_name(std::string* name, const butil::StringPiece& src) {
     name->reserve(name->size() + src.size() + 8/*just guess*/);

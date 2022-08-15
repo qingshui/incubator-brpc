@@ -755,7 +755,7 @@ static TimePercent get_cputime_percent(void*) {
 }
 PassiveStatus<TimePercent> g_cputime_percent(get_cputime_percent, NULL);
 Window<PassiveStatus<TimePercent>, SERIES_IN_SECOND> g_cputime_percent_second(
-    "process_cpu_usage", &g_cputime_percent, FLAGS_bvar_dump_interval);
+    "process_cpu_usage", &g_cputime_percent, FLAGS_brpc_bvar_dump_interval);
 
 static TimePercent get_stime_percent(void*) {
     TimePercent tp = { butil::timeval_to_microseconds(g_ru_stime.get_value()),
@@ -764,7 +764,7 @@ static TimePercent get_stime_percent(void*) {
 }
 PassiveStatus<TimePercent> g_stime_percent(get_stime_percent, NULL);
 Window<PassiveStatus<TimePercent>, SERIES_IN_SECOND> g_stime_percent_second(
-    "process_cpu_usage_system", &g_stime_percent, FLAGS_bvar_dump_interval);
+    "process_cpu_usage_system", &g_stime_percent, FLAGS_brpc_bvar_dump_interval);
 
 static TimePercent get_utime_percent(void*) {
     TimePercent tp = { butil::timeval_to_microseconds(g_ru_utime.get_value()),
@@ -773,7 +773,7 @@ static TimePercent get_utime_percent(void*) {
 }
 PassiveStatus<TimePercent> g_utime_percent(get_utime_percent, NULL);
 Window<PassiveStatus<TimePercent>, SERIES_IN_SECOND> g_utime_percent_second(
-    "process_cpu_usage_user", &g_utime_percent, FLAGS_bvar_dump_interval);
+    "process_cpu_usage_user", &g_utime_percent, FLAGS_brpc_bvar_dump_interval);
 
 // According to http://man7.org/linux/man-pages/man2/getrusage.2.html
 // Unsupported fields in linux:

@@ -25,10 +25,10 @@ namespace bvar {
 
 // TODO: Do we need to expose this flag? Dumping thread may dump different
 // kind of samples, users are unlikely to make good decisions on this value.
-DEFINE_int32(bvar_collector_max_pending_samples, 1000,
+DEFINE_int32(brpc_bvar_collector_max_pending_samples, 1000,
              "Destroy unprocessed samples when they're too many");
 
-DEFINE_int32(bvar_collector_expected_per_second, 1000,
+DEFINE_int32(brpc_bvar_collector_expected_per_second, 1000,
              "Expected number of samples to be collected per second");
 
 // CAUTION: Don't change this value unless you know exactly what it means.
@@ -229,7 +229,7 @@ void Collector::grab_thread() {
                     // FIXME: equal probabilities to drop.
                     ++_ngrab;
                     if (_ngrab >= _ndrop + _ndump +
-                        FLAGS_bvar_collector_max_pending_samples) {
+                        FLAGS_brpc_bvar_collector_max_pending_samples) {
                         ++_ndrop;
                         p->destroy();
                     } else {
@@ -310,11 +310,11 @@ void Collector::update_speed_limit(CollectorSpeedLimit* sl,
             // use the default interval which may make the calculated
             // sampling_range larger.
         }
-        new_sampling_range = FLAGS_bvar_collector_expected_per_second
+        new_sampling_range = FLAGS_brpc_bvar_collector_expected_per_second
             * interval_us * COLLECTOR_SAMPLING_BASE / (1000000L * round_ngrab);
     } else {
         // NOTE: the multiplications are unlikely to overflow.
-        new_sampling_range = FLAGS_bvar_collector_expected_per_second
+        new_sampling_range = FLAGS_brpc_bvar_collector_expected_per_second
             * interval_us * old_sampling_range / (1000000L * round_ngrab);
         // Don't grow or shrink too fast.
         if (interval_us < 1000000L) {
@@ -346,7 +346,7 @@ size_t is_collectable_before_first_time_grabbed(CollectorSpeedLimit* sl) {
             1, butil::memory_order_relaxed);
         if (before_add == 0) {
             sl->first_sample_real_us = butil::gettimeofday_us();
-        } else if (before_add >= FLAGS_bvar_collector_expected_per_second) {
+        } else if (before_add >= FLAGS_brpc_bvar_collector_expected_per_second) {
             butil::get_leaky_singleton<Collector>()->wakeup_grab_thread();
         }
     }

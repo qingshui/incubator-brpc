@@ -28,7 +28,7 @@
 namespace brpc {
 namespace bvar {
 
-DECLARE_int32(bvar_dump_interval);
+DECLARE_int32(brpc_bvar_dump_interval);
 
 enum SeriesFrequency {
     SERIES_IN_WINDOW = 0,
@@ -76,7 +76,7 @@ public:
     
     WindowBase(R* var, time_t window_size)
         : _var(var)
-        , _window_size(window_size > 0 ? window_size : FLAGS_bvar_dump_interval)
+        , _window_size(window_size > 0 ? window_size : FLAGS_brpc_bvar_dump_interval)
         , _sampler(var->get_sampler())
         , _series_sampler(NULL) {
         CHECK_EQ(0, _sampler->set_window_size(_window_size));
@@ -147,7 +147,7 @@ protected:
         const int rc = Variable::expose_impl(prefix, name, display_filter);
         if (rc == 0 &&
             _series_sampler == NULL &&
-            FLAGS_save_series) {
+            FLAGS_brpc_save_series) {
             _series_sampler = new SeriesSampler(this, _var);
             _series_sampler->schedule();
         }

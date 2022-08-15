@@ -35,7 +35,7 @@ class any;
 namespace brpc {
 namespace bvar {
 
-DECLARE_bool(save_series);
+DECLARE_bool(brpc_save_series);
 
 // Bitwise masks of displayable targets 
 enum DisplayFilter {

@@ -23,7 +23,7 @@
 namespace brpc {
 namespace bvar {
 
-DECLARE_bool(quote_vector);
+DECLARE_bool(brpc_quote_vector);
 
 // Data inside a Vector will be plotted in a same graph.
 template <typename T, size_t N>
@@ -91,7 +91,7 @@ private:
 
 template <typename T, size_t N>
 std::ostream& operator<<(std::ostream& os, const Vector<T, N>& vec) {
-    if (FLAGS_quote_vector) {
+    if (FLAGS_brpc_quote_vector) {
         os << '"';
     }
     os << '[';
@@ -102,7 +102,7 @@ std::ostream& operator<<(std::ostream& os, const Vector<T, N>& vec) {
         }
     }
     os << ']';
-    if (FLAGS_quote_vector) {
+    if (FLAGS_brpc_quote_vector) {
         os << '"';
     }
     return os;

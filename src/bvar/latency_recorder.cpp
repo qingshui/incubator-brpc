@@ -23,19 +23,19 @@ namespace bvar {
 
 // Reloading following gflags does not change names of the corresponding bvars.
 // Avoid reloading in practice.
-DEFINE_int32(bvar_latency_p1, 80, "First latency percentile");
-DEFINE_int32(bvar_latency_p2, 90, "Second latency percentile");
-DEFINE_int32(bvar_latency_p3, 99, "Third latency percentile");
+DEFINE_int32(brpc_bvar_latency_p1, 80, "First latency percentile");
+DEFINE_int32(brpc_bvar_latency_p2, 90, "Second latency percentile");
+DEFINE_int32(brpc_bvar_latency_p3, 99, "Third latency percentile");
 
 static bool valid_percentile(const char*, int32_t v) {
     return v > 0 && v < 100;
 }
 const bool ALLOW_UNUSED dummy_bvar_latency_p1 = ::GFLAGS_NS::RegisterFlagValidator(
-    &FLAGS_bvar_latency_p1, valid_percentile);
+    &FLAGS_brpc_bvar_latency_p1, valid_percentile);
 const bool ALLOW_UNUSED dummy_bvar_latency_p2 = ::GFLAGS_NS::RegisterFlagValidator(
-    &FLAGS_bvar_latency_p2, valid_percentile);
+    &FLAGS_brpc_bvar_latency_p2, valid_percentile);
 const bool ALLOW_UNUSED dummy_bvar_latency_p3 = ::GFLAGS_NS::RegisterFlagValidator(
-    &FLAGS_bvar_latency_p3, valid_percentile);
+    &FLAGS_brpc_bvar_latency_p3, valid_percentile);
 
 namespace detail {
 
@@ -118,15 +118,15 @@ static int64_t get_percetile(void* arg) {
 
 static int64_t get_p1(void* arg) {
     LatencyRecorder* lr = static_cast<LatencyRecorder*>(arg);
-    return lr->latency_percentile(FLAGS_bvar_latency_p1 / 100.0);
+    return lr->latency_percentile(FLAGS_brpc_bvar_latency_p1 / 100.0);
 }
 static int64_t get_p2(void* arg) {
     LatencyRecorder* lr = static_cast<LatencyRecorder*>(arg);
-    return lr->latency_percentile(FLAGS_bvar_latency_p2 / 100.0);
+    return lr->latency_percentile(FLAGS_brpc_bvar_latency_p2 / 100.0);
 }
 static int64_t get_p3(void* arg) {
     LatencyRecorder* lr = static_cast<LatencyRecorder*>(arg);
-    return lr->latency_percentile(FLAGS_bvar_latency_p3 / 100.0);
+    return lr->latency_percentile(FLAGS_brpc_bvar_latency_p3 / 100.0);
 }
 
 static Vector<int64_t, 4> get_latencies(void *arg) {
@@ -136,9 +136,9 @@ static Vector<int64_t, 4> get_latencies(void *arg) {
     // other values and make other curves on the plotted graph small and
     // hard to read.
     Vector<int64_t, 4> result;
-    result[0] = cb->get_number(FLAGS_bvar_latency_p1 / 100.0);
-    result[1] = cb->get_number(FLAGS_bvar_latency_p2 / 100.0);
-    result[2] = cb->get_number(FLAGS_bvar_latency_p3 / 100.0);
+    result[0] = cb->get_number(FLAGS_brpc_bvar_latency_p1 / 100.0);
+    result[1] = cb->get_number(FLAGS_brpc_bvar_latency_p2 / 100.0);
+    result[2] = cb->get_number(FLAGS_brpc_bvar_latency_p3 / 100.0);
     result[3] = cb->get_number(0.999);
     return result;
 }
@@ -218,15 +218,15 @@ int LatencyRecorder::expose(const butil::StringPiece& prefix1,
         return -1;
     }
     char namebuf[32];
-    snprintf(namebuf, sizeof(namebuf), "latency_%d", (int)FLAGS_bvar_latency_p1);
+    snprintf(namebuf, sizeof(namebuf), "latency_%d", (int)FLAGS_brpc_bvar_latency_p1);
     if (_latency_p1.expose_as(prefix, namebuf, DISPLAY_ON_PLAIN_TEXT) != 0) {
         return -1;
     }
-    snprintf(namebuf, sizeof(namebuf), "latency_%d", (int)FLAGS_bvar_latency_p2);
+    snprintf(namebuf, sizeof(namebuf), "latency_%d", (int)FLAGS_brpc_bvar_latency_p2);
     if (_latency_p2.expose_as(prefix, namebuf, DISPLAY_ON_PLAIN_TEXT) != 0) {
         return -1;
     }
-    snprintf(namebuf, sizeof(namebuf), "latency_%u", (int)FLAGS_bvar_latency_p3);
+    snprintf(namebuf, sizeof(namebuf), "latency_%u", (int)FLAGS_brpc_bvar_latency_p3);
     if (_latency_p3.expose_as(prefix, namebuf, DISPLAY_ON_PLAIN_TEXT) != 0) {
         return -1;
     }
@@ -243,8 +243,8 @@ int LatencyRecorder::expose(const butil::StringPiece& prefix1,
         return -1;
     }
     snprintf(namebuf, sizeof(namebuf), "%d%%,%d%%,%d%%,99.9%%",
-             (int)FLAGS_bvar_latency_p1, (int)FLAGS_bvar_latency_p2,
-             (int)FLAGS_bvar_latency_p3);
+             (int)FLAGS_brpc_bvar_latency_p1, (int)FLAGS_brpc_bvar_latency_p2,
+             (int)FLAGS_brpc_bvar_latency_p3);
     CHECK_EQ(0, _latency_percentiles.set_vector_names(namebuf));
     return 0;
 }

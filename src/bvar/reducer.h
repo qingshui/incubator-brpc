@@ -172,7 +172,7 @@ protected:
             _series_sampler == NULL &&
             !butil::is_same<InvOp, detail::VoidOp>::value &&
             !butil::is_same<T, std::string>::value &&
-            FLAGS_save_series) {
+            FLAGS_brpc_save_series) {
             _series_sampler = new SeriesSampler(this, _combiner.op());
             _series_sampler->schedule();
         }
