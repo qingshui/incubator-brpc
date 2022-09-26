@@ -78,7 +78,9 @@
     defined(OS_NACL) || defined(OS_QNX)
 #define OS_POSIX 1
 #endif
-
+#ifndef NO_TCMALLOC
+#define NO_TCMALLOC 1
+#endif
 // Use tcmalloc
 #if (defined(OS_WIN) || defined(OS_LINUX) || defined(OS_ANDROID)) && \
     !defined(NO_TCMALLOC)
